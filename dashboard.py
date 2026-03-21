@@ -23,6 +23,7 @@ LEADERBOARD_PATH = "leaderboard.json"
 SUMMARIES_PATH   = "summaries.json"
 LOG_PATH         = "improve.log"
 LOG_TAIL_LINES   = 100
+DATASETS_DIR     = "datasets"
 
 # ── Training process state ────────────────────────────────────────────────────
 _proc: subprocess.Popen | None = None
@@ -34,19 +35,29 @@ def _is_running() -> bool:
         return _proc is not None and _proc.poll() is None
 
 
-def _start_training(extra_args: list[str] | None = None) -> dict:
+def _start_training(
+    dataset_dir: str | None = None,
+    init_model: str | None = None,
+    val_ratio: float = 0.2,
+    test_ratio: float = 0.2,
+    max_trials: int = 0,
+) -> dict:
     global _proc
     with _proc_lock:
         if _proc is not None and _proc.poll() is None:
             return {"ok": False, "error": "Already running"}
-        cmd = ["uv", "run", "python", "improve.py"] + (extra_args or [])
+        cmd = ["uv", "run", "python", "improve.py",
+               "--val-ratio", str(val_ratio),
+               "--test-ratio", str(test_ratio)]
+        if dataset_dir:
+            cmd += ["--dataset-dir", dataset_dir]
+        if init_model:
+            cmd += ["--init-model", init_model]
+        if max_trials:
+            cmd += ["--max-trials", str(max_trials)]
         try:
-            _proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            return {"ok": True, "pid": _proc.pid}
+            _proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return {"ok": True, "pid": _proc.pid, "cmd": " ".join(cmd)}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -61,6 +72,48 @@ def _stop_training() -> dict:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+
+# ── Dataset listing ──────────────────────────────────────────────────────────
+
+def list_datasets() -> list[dict]:
+    """Scan DATASETS_DIR for subdirectories that contain at least one .xlsx file."""
+    if not os.path.isdir(DATASETS_DIR):
+        return []
+    out = []
+    for name in sorted(os.listdir(DATASETS_DIR)):
+        path = os.path.join(DATASETS_DIR, name)
+        if not os.path.isdir(path):
+            continue
+        xlsx = sorted(f for f in os.listdir(path) if f.endswith(".xlsx"))
+        if not xlsx:
+            continue
+        # README
+        readme_path = os.path.join(path, "README.md")
+        readme = ""
+        if os.path.exists(readme_path):
+            with open(readme_path, errors="replace") as f:
+                readme = f.read(4000)
+        # Per-dataset leaderboard (if any)
+        board = _load_json(os.path.join(path, "leaderboard.json"))
+        best_score  = max((e.get("score", -999) for e in board), default=None)
+        best_strat  = next(
+            (e.get("strategy_name","") for e in sorted(board, key=lambda x: x.get("score",-999), reverse=True)),
+            ""
+        ) if board else ""
+        has_model = os.path.exists(os.path.join(path, "agent_best.npz"))
+        out.append({
+            "name":        name,
+            "path":        path,
+            "xlsx":        os.path.join(path, xlsx[-1]),
+            "readme":      readme,
+            "total_trials": len(board),
+            "best_score":  round(best_score, 4) if best_score is not None else None,
+            "best_strategy": best_strat,
+            "has_model":   has_model,
+            "model_path":  os.path.join(path, "agent_best.npz") if has_model else None,
+        })
+    return out
 
 
 # ── Prediction cache ──────────────────────────────────────────────────────────
@@ -383,6 +436,27 @@ tr:hover td{background:var(--card2);}
 .badge-best{background:rgba(63,185,80,.2);color:var(--green);}
 .mono{font-family:'Cascadia Code','Fira Code',monospace;}
 
+/* ── modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.hidden{display:none;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:24px;}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text);}
+.form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.form-row label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);}
+.form-row select,.form-row input[type=number],.form-row input[type=range]{
+  background:var(--card2);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);padding:7px 10px;font-size:13px;width:100%;}
+.form-row select:focus,.form-row input:focus{outline:1px solid var(--blue);}
+.dataset-preview{background:#010409;border:1px solid var(--border);border-radius:6px;
+  font-size:11.5px;padding:10px;max-height:140px;overflow-y:auto;
+  white-space:pre-wrap;color:var(--muted);margin-top:6px;font-family:monospace;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
+.btn-cancel{background:transparent;color:var(--muted);border:1px solid var(--border);}
+.btn-cancel:hover{color:var(--text);}
+
 /* ── split pills ── */
 .split-pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;
   border-radius:12px;border:1px solid var(--border);}
@@ -459,7 +533,7 @@ tr:hover td{background:var(--card2);}
       <span class="status-dot stopped" id="statusDot"></span>
       <span class="status-label" id="statusLabel">Stopped</span>
     </div>
-    <button class="btn btn-start" id="btnStart" onclick="startTraining()">▶ Start training</button>
+    <button class="btn btn-start" id="btnStart" onclick="openStartModal()">▶ Commencer l'entraînement</button>
     <button class="btn btn-stop"  id="btnStop"  onclick="stopTraining()" disabled>■ Stop</button>
     <span class="server-time" id="serverTime">—</span>
   </div>
@@ -593,6 +667,53 @@ tr:hover td{background:var(--card2);}
 
 <div style="height:20px;"></div>
 
+<!-- Start training modal -->
+<div class="modal-overlay hidden" id="startModal">
+  <div class="modal">
+    <h2>▶ Commencer l'entraînement</h2>
+
+    <div class="form-row">
+      <label>Dataset</label>
+      <select id="selDataset" onchange="onDatasetChange()">
+        <option value="">— chargement… —</option>
+      </select>
+      <div class="dataset-preview" id="datasetPreview">Sélectionnez un dataset pour voir le README.</div>
+    </div>
+
+    <div class="form-row">
+      <label>Initialiser depuis un modèle existant (optionnel)</label>
+      <select id="selInitModel">
+        <option value="">Partir de zéro (poids aléatoires)</option>
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">
+        Utilise les poids du meilleur modèle d'un autre dataset comme point de départ.
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Ratio validation — <span id="lblVal">20%</span></label>
+        <input type="range" id="inpVal" min="10" max="40" step="5" value="20"
+               oninput="document.getElementById('lblVal').textContent=this.value+'%'">
+      </div>
+      <div class="form-row">
+        <label>Ratio test — <span id="lblTest">20%</span></label>
+        <input type="range" id="inpTest" min="10" max="40" step="5" value="20"
+               oninput="document.getElementById('lblTest').textContent=this.value+'%'">
+      </div>
+      <div class="form-row">
+        <label>Trials max (0 = infini)</label>
+        <input type="number" id="inpMaxTrials" value="0" min="0" step="10" style="width:100%;">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeStartModal()">Annuler</button>
+      <button class="btn btn-start" id="btnModalStart" onclick="confirmStart()">▶ Lancer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Chart factory ────────────────────────────────────────────────────────────
 const BASE = {
@@ -688,15 +809,80 @@ function buildDist(trials) {
   return {labels:keys.map(k=>`${k}`), counts:keys.map(k=>buckets[k])};
 }
 
-// ── Start / Stop ─────────────────────────────────────────────────────────────
-async function startTraining() {
-  document.getElementById('btnStart').disabled = true;
+// ── Start modal ───────────────────────────────────────────────────────────────
+let _datasets = [];
+
+async function openStartModal() {
+  // Load dataset list
   try {
-    const r = await fetch('/api/start', {method:'POST'});
+    const r = await fetch('/api/datasets');
     const d = await r.json();
-    if (!d.ok) alert('Could not start: ' + d.error);
-  } catch(e) { alert('Error: '+e); }
+    _datasets = d.datasets || [];
+  } catch(e) { _datasets = []; }
+
+  // Populate dataset selector
+  const sel = document.getElementById('selDataset');
+  sel.innerHTML = _datasets.length
+    ? _datasets.map(ds => `<option value="${esc(ds.path)}">${esc(ds.name)}
+        ${ds.total_trials ? ` (${ds.total_trials} trials` + (ds.best_score!=null?`, best ${ds.best_score>0?'+':''}${ds.best_score}`:'')+')' : ''}</option>`).join('')
+    : '<option value="">Aucun dataset trouvé dans datasets/</option>';
+
+  // Populate init model selector
+  const selM = document.getElementById('selInitModel');
+  const withModel = _datasets.filter(ds => ds.has_model);
+  selM.innerHTML = '<option value="">Partir de zéro (poids aléatoires)</option>'
+    + withModel.map(ds => `<option value="${esc(ds.model_path)}">
+        ${esc(ds.name)} — agent_best.npz
+        ${ds.best_score!=null ? ` (score ${ds.best_score>0?'+':''}${ds.best_score})` : ''}</option>`).join('');
+
+  onDatasetChange();
+  document.getElementById('startModal').classList.remove('hidden');
 }
+
+function closeStartModal() {
+  document.getElementById('startModal').classList.add('hidden');
+}
+
+function onDatasetChange() {
+  const sel   = document.getElementById('selDataset');
+  const prev  = document.getElementById('datasetPreview');
+  const ds = _datasets.find(d => d.path === sel.value);
+  prev.textContent = ds ? (ds.readme || '(no README.md found)') : '';
+}
+
+async function confirmStart() {
+  const datasetDir = document.getElementById('selDataset').value;
+  const initModel  = document.getElementById('selInitModel').value || null;
+  const valRatio   = parseFloat(document.getElementById('inpVal').value) / 100;
+  const testRatio  = parseFloat(document.getElementById('inpTest').value) / 100;
+  const maxTrials  = parseInt(document.getElementById('inpMaxTrials').value) || 0;
+
+  document.getElementById('btnModalStart').disabled = true;
+  try {
+    const r = await fetch('/api/start', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({dataset_dir: datasetDir||null, init_model: initModel,
+                            val_ratio: valRatio, test_ratio: testRatio, max_trials: maxTrials}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      closeStartModal();
+    } else {
+      alert('Erreur : ' + d.error);
+      document.getElementById('btnModalStart').disabled = false;
+    }
+  } catch(e) {
+    alert('Erreur : ' + e);
+    document.getElementById('btnModalStart').disabled = false;
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('startModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeStartModal();
+});
+
 async function stopTraining() {
   document.getElementById('btnStop').disabled = true;
   try {
@@ -707,14 +893,13 @@ async function stopTraining() {
 }
 
 function updateRunControls(isRunning) {
-  const dot   = document.getElementById('statusDot');
-  const label = document.getElementById('statusLabel');
-  const btnS  = document.getElementById('btnStart');
-  const btnT  = document.getElementById('btnStop');
-  dot.className   = 'status-dot ' + (isRunning ? 'running' : 'stopped');
-  label.textContent = isRunning ? 'Training running…' : 'Stopped';
-  btnS.disabled   = isRunning;
-  btnT.disabled   = !isRunning;
+  document.getElementById('statusDot').className = 'status-dot ' + (isRunning ? 'running' : 'stopped');
+  document.getElementById('statusLabel').textContent = isRunning ? 'Entraînement en cours…' : 'Arrêté';
+  document.getElementById('btnStart').disabled = isRunning;
+  document.getElementById('btnStop').disabled  = !isRunning;
+  // Keep modal start button in sync
+  const mb = document.getElementById('btnModalStart');
+  if (mb) mb.disabled = isRunning;
 }
 
 // ── Summaries ────────────────────────────────────────────────────────────────
@@ -1038,13 +1223,34 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, build_predictions())
             except Exception as e:
                 self._json(500, {"error": str(e)})
+        elif self.path == "/api/datasets":
+            try:
+                self._json(200, {"datasets": list_datasets()})
+            except Exception as e:
+                self._json(500, {"error": str(e)})
         else:
             self.send_response(404)
             self.end_headers()
 
+    def _read_body(self) -> dict:
+        length = int(self.headers.get("Content-Length", 0))
+        if length:
+            try:
+                return json.loads(self.rfile.read(length))
+            except Exception:
+                pass
+        return {}
+
     def do_POST(self):
         if self.path == "/api/start":
-            self._json(200, _start_training())
+            body = self._read_body()
+            self._json(200, _start_training(
+                dataset_dir = body.get("dataset_dir"),
+                init_model  = body.get("init_model"),
+                val_ratio   = float(body.get("val_ratio",  0.2)),
+                test_ratio  = float(body.get("test_ratio", 0.2)),
+                max_trials  = int(body.get("max_trials", 0)),
+            ))
         elif self.path == "/api/stop":
             self._json(200, _stop_training())
         else:

@@ -158,6 +158,25 @@ def build_agent(strategy: Strategy, n_matches: int, seed: int) -> REINFORCEAgent
     )
 
 
+def _warm_start(agent: REINFORCEAgent, init_model_path: str) -> None:
+    """Copy weights from init_model_path into agent (best-effort, silent on mismatch)."""
+    try:
+        src = REINFORCEAgent.load(init_model_path)
+        if isinstance(agent, MLPREINFORCEAgent) and isinstance(src, MLPREINFORCEAgent):
+            if agent.W1.shape == src.W1.shape and agent.W2.shape == src.W2.shape:
+                agent.W1[:] = src.W1; agent.b1[:] = src.b1
+                agent.W2[:] = src.W2; agent.b2[:] = src.b2
+                return
+        elif not isinstance(agent, MLPREINFORCEAgent) and not isinstance(src, MLPREINFORCEAgent):
+            if agent.W.shape == src.W.shape:
+                agent.W[:] = src.W; agent.b[:] = src.b
+                return
+        log(f"   Warm-start skipped: architecture mismatch "
+            f"({type(src).__name__} → {type(agent).__name__})")
+    except Exception as e:
+        log(f"   Warm-start failed: {e}")
+
+
 def train_trial(
     strategy: Strategy,
     train_grids: list[dict],
@@ -165,6 +184,7 @@ def train_trial(
     test_grids: list[dict],
     trial_idx: int,
     seed: int = 0,
+    init_model_path: str | None = None,
 ) -> tuple[REINFORCEAgent, TrialResult]:
     n_matches = train_grids[0]["n_matches"]
     k = min(strategy.k_max, 50)
@@ -175,6 +195,8 @@ def train_trial(
     eval_test  = LotoFootEnv(test_grids,  k_max=k, mode="eval")
 
     agent = build_agent(strategy, n_matches, seed)
+    if init_model_path and os.path.exists(init_model_path):
+        _warm_start(agent, init_model_path)
 
     obs, _ = train_env.reset(seed=seed)
     for ep in range(1, strategy.episodes + 1):
@@ -538,7 +560,14 @@ def log(msg: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Autonomous RL strategy improver")
-    parser.add_argument("--file",        type=str, default=EXCEL_FILE)
+    parser.add_argument("--dataset-dir", type=str, default=".",
+                        help="Directory containing the .xlsx file and where outputs go "
+                             "(default: current directory)")
+    parser.add_argument("--file",        type=str, default=None,
+                        help="Excel file path (default: auto-detected in --dataset-dir)")
+    parser.add_argument("--init-model",  type=str, default=None,
+                        help="Path to a .npz to warm-start all trials from "
+                             "(e.g. datasets/other-dataset/agent_best.npz)")
     parser.add_argument("--val-ratio",   type=float, default=0.2,
                         help="Fraction of data for validation (default: 0.2)")
     parser.add_argument("--test-ratio",  type=float, default=0.2,
@@ -547,6 +576,30 @@ def main() -> None:
                         help="Stop after N trials (0 = run forever)")
     parser.add_argument("--seed",        type=int, default=42)
     args = parser.parse_args()
+
+    # ── Override global output paths to dataset_dir ───────────────────────
+    d = args.dataset_dir
+    if d != ".":
+        os.makedirs(d, exist_ok=True)
+        global BEST_MODEL_PATH, LEADERBOARD_PATH, SUMMARIES_PATH
+        global LOG_PATH, FIGURES_PATH, CLAUDE_MD_PATH
+        BEST_MODEL_PATH  = os.path.join(d, "agent_best.npz")
+        LEADERBOARD_PATH = os.path.join(d, "leaderboard.json")
+        SUMMARIES_PATH   = os.path.join(d, "summaries.json")
+        LOG_PATH         = os.path.join(d, "improve.log")
+        FIGURES_PATH     = os.path.join(d, "improvement.png")
+        CLAUDE_MD_PATH   = os.path.join(d, "README.md")
+
+    # ── Auto-detect xlsx in dataset_dir if --file not given ───────────────
+    if args.file is None:
+        xls_files = sorted(f for f in os.listdir(d) if f.endswith(".xlsx"))
+        if xls_files:
+            args.file = os.path.join(d, xls_files[-1])
+        else:
+            args.file = EXCEL_FILE  # fall back to project-root default
+
+    if args.init_model:
+        log(f"Warm-start from: {args.init_model}")
 
     # ── Load data ────────────────────────────────────────────────────────
     all_grids = load_data(args.file)
@@ -606,7 +659,8 @@ def main() -> None:
             t0 = time.time()
 
             try:
-                agent, result = train_trial(strategy, train_grids, val_grids, test_grids, trial, seed)
+                agent, result = train_trial(strategy, train_grids, val_grids, test_grids,
+                                           trial, seed, init_model_path=args.init_model)
             except Exception as e:
                 log(f"   ERROR: {e}")
                 continue

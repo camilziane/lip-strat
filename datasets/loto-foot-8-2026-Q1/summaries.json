@@ -148,5 +148,41 @@
     ],
     "total_trials_so_far": 5,
     "commit": "7732256"
+  },
+  {
+    "improvement_number": 4,
+    "trial": 9,
+    "strategy": "k8",
+    "keywords": [
+      "linear",
+      "k=8"
+    ],
+    "policy": "linear",
+    "score": -8.0,
+    "score_delta": 2.0,
+    "val_net": -8.0,
+    "val_hit_pct": 0.0,
+    "test_net": 49.85,
+    "test_hit_pct": 50.0,
+    "timestamp": "2026-03-21 22:15",
+    "key_change": "Added: [k=8]  Removed: [lr=0.05]",
+    "what_worked": [
+      "Strategy [k8] found a better combination of features"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try MLP policy (h=64 or h=128) with same lr=0.0050 \u2014 non-linear features may extract more signal from odds + crowd %",
+      "Try ep=12k or ep=20k with current winning config [linear, k=8] \u2014 more training may refine the policy",
+      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
+    ],
+    "predefined_not_yet_tried": [
+      "k32",
+      "k50",
+      "ep_12k",
+      "ep_20k",
+      "mlp_32"
+    ],
+    "total_trials_so_far": 9,
+    "commit": "0174921"
   }
 ]
