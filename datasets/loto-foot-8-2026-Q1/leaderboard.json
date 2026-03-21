@@ -21,5 +21,48 @@
     "model_path": "datasets/loto-foot-8-2026-Q1/agent_best.npz",
     "timestamp": "2026-03-21 22:14",
     "commit_hash": "8140806"
+  },
+  {
+    "trial": 2,
+    "strategy_name": "baseline",
+    "keywords": [
+      "linear",
+      "lr=0.005",
+      "entropy=0.05",
+      "k=20",
+      "ep=6k"
+    ],
+    "val_net_per_round": -12.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -12.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -14.25,
+    "n_train_rounds": 8,
+    "n_val_rounds": 2,
+    "n_test_rounds": 2,
+    "score": -12.0,
+    "model_path": "datasets/loto-foot-8-2026-Q1/agent_best.npz",
+    "timestamp": "2026-03-21 22:15",
+    "commit_hash": "61a9605"
+  },
+  {
+    "trial": 3,
+    "strategy_name": "lr_high",
+    "keywords": [
+      "linear",
+      "lr=0.02"
+    ],
+    "val_net_per_round": -14.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -14.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -13.75,
+    "n_train_rounds": 8,
+    "n_val_rounds": 2,
+    "n_test_rounds": 2,
+    "score": -14.0,
+    "model_path": "datasets/loto-foot-8-2026-Q1/agent_best.npz",
+    "timestamp": "2026-03-21 22:15",
+    "commit_hash": ""
   }
 ]

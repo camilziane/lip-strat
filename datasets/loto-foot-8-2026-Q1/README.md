@@ -21,5 +21,7 @@
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-16.00 | 0.0% | $-16.00 | 0.0% | 8140806 |
+| 1 | 2 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-12.00 | 0.0% | $-12.00 | 0.0% | 61a9605 |
+| 2 | 3 | `lr_high` | linear, lr=0.02 | $-14.00 | 0.0% | $-14.00 | 0.0% | — |
+| 3 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-16.00 | 0.0% | $-16.00 | 0.0% | 8140806 |
 <!-- LEADERBOARD_END -->
