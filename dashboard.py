@@ -885,6 +885,12 @@ async function confirmStart() {
     const d = await r.json();
     if (d.ok) {
       closeStartModal();
+      // Switch view to the newly launched dataset
+      currentDir = d.active_dir || '';
+      _lastBestCommit = null;
+      prevLogLen = 0;
+      document.getElementById('logBox').innerHTML = 'Loading…';
+      populateViewSelector();   // refreshes selector list + triggers fetchAndRender
     } else {
       alert('Erreur : ' + d.error);
       document.getElementById('btnModalStart').disabled = false;
