@@ -61,5 +61,65 @@
     "model_path": "datasets/test/agent_best.npz",
     "timestamp": "2026-03-21 22:38",
     "commit_hash": ""
+  },
+  {
+    "trial": 4,
+    "strategy_name": "lr_very_high",
+    "keywords": [
+      "linear",
+      "lr=0.05"
+    ],
+    "val_net_per_round": -14.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -16.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -14.25,
+    "n_train_rounds": 8,
+    "n_val_rounds": 2,
+    "n_test_rounds": 2,
+    "score": -14.0,
+    "model_path": "datasets/test/agent_best.npz",
+    "timestamp": "2026-03-21 22:38",
+    "commit_hash": "9980768"
+  },
+  {
+    "trial": 5,
+    "strategy_name": "entropy_low",
+    "keywords": [
+      "linear",
+      "entropy=0.01"
+    ],
+    "val_net_per_round": -17.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": 40.85,
+    "test_round_hit_rate": 0.5,
+    "train_net_per_round": 57.12,
+    "n_train_rounds": 8,
+    "n_val_rounds": 2,
+    "n_test_rounds": 2,
+    "score": -17.0,
+    "model_path": "datasets/test/agent_best.npz",
+    "timestamp": "2026-03-21 22:38",
+    "commit_hash": ""
+  },
+  {
+    "trial": 6,
+    "strategy_name": "entropy_high",
+    "keywords": [
+      "linear",
+      "entropy=0.2"
+    ],
+    "val_net_per_round": -15.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -15.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -14.0,
+    "n_train_rounds": 8,
+    "n_val_rounds": 2,
+    "n_test_rounds": 2,
+    "score": -15.0,
+    "model_path": "datasets/test/agent_best.npz",
+    "timestamp": "2026-03-21 22:38",
+    "commit_hash": ""
   }
 ]
