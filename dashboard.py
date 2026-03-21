@@ -57,7 +57,7 @@ def _start_training(
             cmd += ["--max-trials", str(max_trials)]
         try:
             _proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return {"ok": True, "pid": _proc.pid, "cmd": " ".join(cmd)}
+            return {"ok": True, "pid": _proc.pid, "active_dir": dataset_dir or "."}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -116,16 +116,18 @@ def list_datasets() -> list[dict]:
     return out
 
 
-# ── Prediction cache ──────────────────────────────────────────────────────────
-_pred_cache: dict = {"mtime": None, "data": None}
+# ── Prediction cache (keyed by dataset_dir+mtime) ────────────────────────────
+_pred_cache: dict = {}
 
 
-def build_predictions() -> dict:
+def build_predictions(dataset_dir: str = "") -> dict:
     """Run agent_best.npz on val + test grids and return per-round predictions."""
-    agent_path = "agent_best.npz"
+    d = dataset_dir or "."
+    agent_path = os.path.join(d, "agent_best.npz")
     mtime = os.path.getmtime(agent_path) if os.path.exists(agent_path) else None
-    if _pred_cache["mtime"] == mtime and _pred_cache["data"] is not None:
-        return _pred_cache["data"]
+    cache_key = (d, mtime)
+    if cache_key in _pred_cache and mtime is not None:
+        return _pred_cache[cache_key]
 
     if mtime is None:
         return {"val": [], "test": [], "n_train": 0, "n_val": 0, "n_test": 0,
@@ -137,7 +139,10 @@ def build_predictions() -> dict:
         from train import REINFORCEAgent, load_data, split_data, EXCEL_FILE
         from env import make_obs, N_OUTCOMES
 
-        all_grids = load_data(EXCEL_FILE)
+        # Auto-detect xlsx in dataset_dir
+        xlsx_in_dir = sorted(f for f in os.listdir(d) if f.endswith(".xlsx")) if os.path.isdir(d) else []
+        xlsx_path = os.path.join(d, xlsx_in_dir[-1]) if xlsx_in_dir else EXCEL_FILE
+        all_grids = load_data(xlsx_path)
         if not all_grids:
             return {"val": [], "test": [], "n_train": 0, "n_val": 0, "n_test": 0,
                     "error": "No grids loaded"}
@@ -146,6 +151,7 @@ def build_predictions() -> dict:
             all_grids, val_ratio=0.2, test_ratio=0.2, seed=42
         )
         agent = REINFORCEAgent.load(agent_path)
+        agent_path_for_cache = agent_path  # captured for closure
 
         def predict_rounds(grids: list) -> list:
             rounds_out = []
@@ -221,8 +227,7 @@ def build_predictions() -> dict:
             "n_val":   len(val_grids),
             "n_test":  len(test_grids),
         }
-        _pred_cache["mtime"] = mtime
-        _pred_cache["data"]  = data
+        _pred_cache[cache_key] = data
         return data
 
     except Exception as e:
@@ -242,11 +247,13 @@ def _load_json(path: str) -> list:
     return []
 
 
-def _log_tail(n: int = LOG_TAIL_LINES) -> list[str]:
-    if not os.path.exists(LOG_PATH):
+def _log_tail(dataset_dir: str = "", n: int = LOG_TAIL_LINES) -> list[str]:
+    d = dataset_dir or "."
+    log_path = os.path.join(d, "improve.log")
+    if not os.path.exists(log_path):
         return []
     try:
-        with open(LOG_PATH, "rb") as f:
+        with open(log_path, "rb") as f:
             f.seek(0, 2)
             buf = min(f.tell(), 65536)
             f.seek(-buf, 2)
@@ -256,9 +263,10 @@ def _log_tail(n: int = LOG_TAIL_LINES) -> list[str]:
         return []
 
 
-def build_api_data() -> dict:
-    board     = _load_json(LEADERBOARD_PATH)
-    summaries = _load_json(SUMMARIES_PATH)
+def build_api_data(dataset_dir: str = "") -> dict:
+    d = dataset_dir or "."
+    board     = _load_json(os.path.join(d, "leaderboard.json"))
+    summaries = _load_json(os.path.join(d, "summaries.json"))
 
     # ── bests in chronological order ─────────────────────────────────────────
     bests = sorted(
@@ -316,7 +324,7 @@ def build_api_data() -> dict:
     current_best_score = best_entry["score"] if best_entry else None
 
     training_elapsed_s = None
-    log_lines = _log_tail()
+    log_lines = _log_tail(dataset_dir)
     for line in log_lines:
         if line.startswith("[") and len(line) > 20:
             try:
@@ -354,6 +362,7 @@ def build_api_data() -> dict:
         "recent_trials":      recent_rows,
         "summaries":          summaries,
         "log_tail":           log_lines,
+        "dataset_dir":        d,
         "server_time":        datetime.now().strftime("%H:%M:%S"),
     }
 
@@ -531,7 +540,15 @@ tr:hover td{background:var(--card2);}
   <div class="header-right">
     <div style="display:flex;align-items:center;gap:6px;">
       <span class="status-dot stopped" id="statusDot"></span>
-      <span class="status-label" id="statusLabel">Stopped</span>
+      <span class="status-label" id="statusLabel">Arrêté</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:11px;color:var(--muted);">Vue&nbsp;:</span>
+      <select id="hdrDataset" onchange="onViewDatasetChange()"
+              style="background:var(--card2);border:1px solid var(--border);border-radius:6px;
+                     color:var(--text);padding:4px 8px;font-size:12px;cursor:pointer;">
+        <option value="">— chargement… —</option>
+      </select>
     </div>
     <button class="btn btn-start" id="btnStart" onclick="openStartModal()">▶ Commencer l'entraînement</button>
     <button class="btn btn-stop"  id="btnStop"  onclick="stopTraining()" disabled>■ Stop</button>
@@ -1153,21 +1170,54 @@ function showPredTab(tab) {
   document.getElementById('tabTest').classList.toggle('active', tab==='test');
 }
 let _predModelMtime = null;
-async function loadPredictions() {
+
+// ── Current dataset view ─────────────────────────────────────────────────────
+let currentDir = '';   // dataset_dir being viewed ('' = project root)
+
+function dirParam() { return currentDir ? '?dir=' + encodeURIComponent(currentDir) : ''; }
+
+async function populateViewSelector() {
   try {
-    const r = await fetch('/api/predictions');
-    if (!r.ok) return;
+    const r = await fetch('/api/datasets');
     const d = await r.json();
-    renderPredictions(d);
-  } catch(e) { /* silent */ }
+    const sel = document.getElementById('hdrDataset');
+    const datasets = d.datasets || [];
+    sel.innerHTML =
+      '<option value="">— projet root —</option>' +
+      datasets.map(ds =>
+        `<option value="${esc(ds.path)}">${esc(ds.name)}`+
+        (ds.best_score!=null?` · best ${ds.best_score>0?'+':''}${ds.best_score}`:'')+
+        `</option>`
+      ).join('');
+    // Auto-select first dataset if available
+    if (!currentDir && datasets.length) {
+      currentDir = datasets[0].path;
+      sel.value  = currentDir;
+    } else if (currentDir) {
+      sel.value = currentDir;
+    }
+    // Render with the correct dataset now that currentDir is set
+    _lastBestCommit = null;
+    fetchAndRender();
+  } catch(e) {
+    fetchAndRender();  // still render even if dataset list fails
+  }
 }
-loadPredictions();  // initial load
+
+function onViewDatasetChange() {
+  currentDir = document.getElementById('hdrDataset').value;
+  _lastBestCommit = null;   // force predictions reload
+  prevLogLen = 0;           // force log re-render
+  document.getElementById('logBox').innerHTML = 'Loading…';
+  fetchAndRender();
+  loadPredictions();
+}
 
 // ── Polling ──────────────────────────────────────────────────────────────────
 let _lastBestCommit = null;
 async function fetchAndRender() {
   try {
-    const r = await fetch('/api/data');
+    const r = await fetch('/api/data' + dirParam());
     if (!r.ok) { document.getElementById('serverTime').textContent = 'Error'; return; }
     const d = await r.json();
     render(d);
@@ -1182,7 +1232,16 @@ async function fetchAndRender() {
     document.getElementById('serverTime').textContent = 'Connection error — retrying…';
   }
 }
-fetchAndRender();
+
+async function loadPredictions() {
+  try {
+    const r = await fetch('/api/predictions' + dirParam());
+    if (!r.ok) return;
+    renderPredictions(await r.json());
+  } catch(e) {}
+}
+
+populateViewSelector();  // sets currentDir then calls fetchAndRender()
 setInterval(fetchAndRender, 3000);
 </script>
 </body>
@@ -1205,25 +1264,37 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _qs(self) -> dict:
+        from urllib.parse import urlparse, parse_qs
+        return parse_qs(urlparse(self.path).query)
+
+    def _base_path(self) -> str:
+        from urllib.parse import urlparse
+        return urlparse(self.path).path
+
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        qs   = self._qs()
+        path = self._base_path()
+        ddir = qs.get("dir", [""])[0]  # dataset_dir query param
+
+        if path in ("/", "/index.html"):
             body = HTML.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/api/data":
+        elif path == "/api/data":
             try:
-                self._json(200, build_api_data())
+                self._json(200, build_api_data(ddir))
             except Exception as e:
                 self._json(500, {"error": str(e)})
-        elif self.path == "/api/predictions":
+        elif path == "/api/predictions":
             try:
-                self._json(200, build_predictions())
+                self._json(200, build_predictions(ddir))
             except Exception as e:
                 self._json(500, {"error": str(e)})
-        elif self.path == "/api/datasets":
+        elif path == "/api/datasets":
             try:
                 self._json(200, {"datasets": list_datasets()})
             except Exception as e:
