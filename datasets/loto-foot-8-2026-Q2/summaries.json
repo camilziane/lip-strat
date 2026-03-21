@@ -214,5 +214,38 @@
     "predefined_not_yet_tried": [],
     "total_trials_so_far": 41,
     "commit": "9388e17"
+  },
+  {
+    "improvement_number": 6,
+    "trial": 135,
+    "strategy": "random_134",
+    "keywords": [
+      "linear",
+      "lr=0.0013",
+      "entropy=0.002",
+      "k=32",
+      "ep=4k"
+    ],
+    "policy": "linear",
+    "score": 77.0,
+    "score_delta": 22.0,
+    "val_net": 52.0,
+    "val_hit_pct": 50.0,
+    "test_net": -8.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-21 22:21",
+    "key_change": "Added: [entropy=0.002, ep=4k, k=32, linear, lr=0.0013]  Removed: [entropy=0.032, ep=16k, h=64, k=20, lr=0.0167, mlp]",
+    "what_worked": [
+      "Wider system bet (k=32) covered more combinations",
+      "Near-zero entropy \u2014 policy exploits learned patterns aggressively"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try MLP policy (h=64 or h=128) with same lr=0.0013 \u2014 non-linear features may extract more signal from odds + crowd %",
+      "Try ep=12k or ep=20k with current winning config [linear, lr=0.0013, entropy=0.002, k=32, ep=4k] \u2014 more training may refine the policy",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
+    ],
+    "predefined_not_yet_tried": [],
+    "total_trials_so_far": 135,
+    "commit": "0d28ed8"
   }
 ]
