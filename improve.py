@@ -2,11 +2,12 @@
 improve.py — Autonomous RL strategy improvement loop.
 
 Runs continuously, trying different strategies and architectures.
-When a new best is found on the test set, it:
+When a new best is found on the val set, it:
   1. Saves the model as agent_best.npz
   2. Appends to leaderboard.json
   3. Updates the LEADERBOARD section in CLAUDE.md
-  4. Commits everything to git
+  4. Updates improvement figures (improvement.png)
+  5. Commits everything to git
 
 Designed to run for hours or days without interruption.
 
@@ -14,7 +15,7 @@ Usage:
     uv run python improve.py                          # run forever
     uv run python improve.py --max-trials 50          # stop after N trials
     uv run python improve.py --file new_data.xlsx     # use different data
-    uv run python improve.py --test-grids 3           # different test split
+    uv run python improve.py --val-ratio 0.2 --test-ratio 0.2  # different split
 """
 
 from __future__ import annotations
@@ -42,12 +43,15 @@ from train import (
     _print_results,
     load_data,
     parse_cutoff_date,
+    split_data,
 )
 
 BEST_MODEL_PATH = "agent_best.npz"
 LEADERBOARD_PATH = "leaderboard.json"
+SUMMARIES_PATH = "summaries.json"
 CLAUDE_MD_PATH = "CLAUDE.md"
 LOG_PATH = "improve.log"
+FIGURES_PATH = "improvement.png"
 
 LEADERBOARD_START = "<!-- LEADERBOARD_START -->"
 LEADERBOARD_END = "<!-- LEADERBOARD_END -->"
@@ -127,12 +131,15 @@ class TrialResult:
     trial: int
     strategy_name: str
     keywords: list[str]
+    val_net_per_round: float
+    val_round_hit_rate: float
     test_net_per_round: float
     test_round_hit_rate: float
     train_net_per_round: float
-    n_test_rounds: int
     n_train_rounds: int
-    score: float              # primary ranking metric
+    n_val_rounds: int
+    n_test_rounds: int
+    score: float              # primary ranking metric (based on val set)
     model_path: str
     timestamp: str
     commit_hash: str = ""
@@ -154,6 +161,7 @@ def build_agent(strategy: Strategy, n_matches: int, seed: int) -> REINFORCEAgent
 def train_trial(
     strategy: Strategy,
     train_grids: list[dict],
+    val_grids: list[dict],
     test_grids: list[dict],
     trial_idx: int,
     seed: int = 0,
@@ -161,8 +169,9 @@ def train_trial(
     n_matches = train_grids[0]["n_matches"]
     k = min(strategy.k_max, 50)
 
-    train_env = LotoFootEnv(train_grids, k_max=k, mode="train")
+    train_env  = LotoFootEnv(train_grids, k_max=k, mode="train")
     eval_train = LotoFootEnv(train_grids, k_max=k, mode="eval")
+    eval_val   = LotoFootEnv(val_grids,   k_max=k, mode="eval")
     eval_test  = LotoFootEnv(test_grids,  k_max=k, mode="eval")
 
     agent = build_agent(strategy, n_matches, seed)
@@ -175,23 +184,29 @@ def train_trial(
         obs, _ = train_env.reset()
 
     train_r = _collect_results(eval_train, lambda o: agent.act(o, deterministic=False))
+    val_r   = _collect_results(eval_val,   lambda o: agent.act(o, deterministic=False))
     test_r  = _collect_results(eval_test,  lambda o: agent.act(o, deterministic=False))
 
+    val_net_pr    = val_r["net"] / max(val_r["n_rounds"], 1)
+    val_hit_rate  = val_r["round_hit_rate"]
     test_net_pr   = test_r["net"] / max(test_r["n_rounds"], 1)
     test_hit_rate = test_r["round_hit_rate"]
     train_net_pr  = train_r["net"] / max(train_r["n_rounds"], 1)
-    # Primary score: test net/round + bonus for hitting rounds
-    score = test_net_pr + 50.0 * test_hit_rate
+    # Primary score: val net/round + bonus for hitting rounds (val-based selection)
+    score = val_net_pr + 50.0 * val_hit_rate
 
     result = TrialResult(
         trial=trial_idx,
         strategy_name=strategy.name,
         keywords=strategy.keywords,
+        val_net_per_round=round(val_net_pr, 2),
+        val_round_hit_rate=round(val_hit_rate, 4),
         test_net_per_round=round(test_net_pr, 2),
         test_round_hit_rate=round(test_hit_rate, 4),
         train_net_per_round=round(train_net_pr, 2),
-        n_test_rounds=test_r["n_rounds"],
         n_train_rounds=train_r["n_rounds"],
+        n_val_rounds=val_r["n_rounds"],
+        n_test_rounds=test_r["n_rounds"],
         score=round(score, 4),
         model_path=BEST_MODEL_PATH,
         timestamp=datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
@@ -232,15 +247,18 @@ def update_claude_md(board: list[dict]) -> None:
 
     top = sorted(board, key=lambda e: e["score"], reverse=True)[:20]
 
-    rows = ["| Rank | Trial | Strategy | Keywords | Test Net/Round | Hit Rate | Train Net/Round | Commit |",
-            "|------|-------|----------|----------|---------------|----------|-----------------|--------|"]
+    rows = ["| Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |",
+            "|------|-------|----------|----------|--------------|----------|----------------|-----------|--------|"]
     for i, e in enumerate(top, 1):
         kw = ", ".join(e["keywords"])
         commit = e.get("commit_hash", "")[:7] or "—"
+        val_net = e.get("val_net_per_round", e.get("test_net_per_round", 0))
+        val_hit = e.get("val_round_hit_rate", e.get("test_round_hit_rate", 0))
         rows.append(
             f"| {i} | {e['trial']} | `{e['strategy_name']}` | {kw} "
+            f"| ${val_net:+.2f} | {val_hit*100:.1f}% "
             f"| ${e['test_net_per_round']:+.2f} | {e['test_round_hit_rate']*100:.1f}% "
-            f"| ${e['train_net_per_round']:+.2f} | {commit} |"
+            f"| {commit} |"
         )
 
     table = "\n".join(rows)
@@ -256,22 +274,241 @@ def update_claude_md(board: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Agent summaries  (written on each new best; read by the next run)
+# ---------------------------------------------------------------------------
+
+def load_summaries() -> list[dict]:
+    if os.path.exists(SUMMARIES_PATH):
+        try:
+            with open(SUMMARIES_PATH) as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def _kw_map(keywords: list[str]) -> dict[str, str]:
+    """Parse ['lr=0.02', 'mlp', 'h=64'] → {'lr': '0.02', 'mlp': '', 'h': '64'}."""
+    out: dict[str, str] = {}
+    for kw in keywords:
+        if "=" in kw:
+            k, v = kw.split("=", 1)
+            out[k] = v
+        else:
+            out[kw] = ""
+    return out
+
+
+def generate_improvement_summary(
+    result: TrialResult,
+    prev_best: dict | None,
+    board: list[dict],
+) -> dict:
+    """
+    Auto-generate a structured summary of what worked and what to try next.
+    Saved to summaries.json; read by the next agent run for context.
+    """
+    kw = _kw_map(result.keywords)
+    policy = "mlp" if "mlp" in kw else "linear"
+    lr = float(kw.get("lr", 0.005))
+    entropy = float(kw.get("entropy", 0.05)) if "entropy" in kw else 0.05
+    h = int(kw.get("h", 0))
+    ep_str = kw.get("ep", "6k")
+    ep = int(ep_str.replace("k", "")) * 1000 if "k" in ep_str else int(ep_str)
+    k_val = int(kw.get("k", 20))
+
+    score_delta = result.score - (prev_best["score"] if prev_best else 0.0)
+
+    # Key change from previous best
+    if prev_best:
+        prev_kw = set(prev_best.get("keywords", []))
+        cur_kw  = set(result.keywords)
+        added   = cur_kw - prev_kw
+        removed = prev_kw - cur_kw
+        key_change = (
+            f"Added: [{', '.join(sorted(added))}]" if added else ""
+        ) + (
+            f"  Removed: [{', '.join(sorted(removed))}]" if removed else ""
+        ) or "Same keywords, different seed or data split"
+    else:
+        key_change = "First improvement found"
+
+    # What worked analysis
+    insights: list[str] = []
+    if policy == "mlp":
+        insights.append(f"Non-linear MLP policy (h={h}) beat the linear baseline")
+    if lr >= 0.02:
+        insights.append(f"Higher learning rate ({lr}) helped — faster adaptation to prize structure")
+    elif lr <= 0.001:
+        insights.append(f"Low learning rate ({lr}) — slow but stable convergence")
+    if ep >= 12000:
+        insights.append(f"More episodes ({ep_str}) gave better convergence")
+    if k_val >= 32:
+        insights.append(f"Wider system bet (k={k_val}) covered more combinations")
+    if entropy <= 0.01:
+        insights.append("Near-zero entropy — policy exploits learned patterns aggressively")
+    if not insights:
+        insights.append(f"Strategy [{result.strategy_name}] found a better combination of features")
+
+    # What to try next (hypotheses for the next agent)
+    tried_strategies = {e["strategy_name"] for e in board}
+    hypotheses: list[str] = []
+
+    if policy == "linear":
+        hypotheses.append(
+            f"Try MLP policy (h=64 or h=128) with same lr={lr:.4f} — "
+            "non-linear features may extract more signal from odds + crowd %"
+        )
+    else:
+        if h < 128:
+            hypotheses.append(
+                f"Try larger MLP h={h * 2} — with only 10 features/match, "
+                "more capacity may help"
+            )
+        hypotheses.append(
+            "Try a 2-hidden-layer MLP: add second layer after ReLU "
+            "(needs architecture change in train.py)"
+        )
+
+    if ep < 12000:
+        hypotheses.append(
+            f"Try ep=12k or ep=20k with current winning config "
+            f"[{', '.join(result.keywords)}] — more training may refine the policy"
+        )
+
+    if lr < 0.02 and "lr_high" not in tried_strategies:
+        hypotheses.append(f"Try lr=0.02 — higher LR sometimes escapes flat regions faster")
+    elif lr >= 0.02 and entropy > 0.05:
+        hypotheses.append("Try entropy=0.01 — reduce exploration once a good LR is found")
+
+    if k_val <= 20:
+        hypotheses.append(
+            "Try k=32 — wider system bet coverage increases chances of hitting rang2 "
+            "at the cost of more grids per round"
+        )
+
+    # Reward shaping idea
+    hypotheses.append(
+        "Try reward shaping: scale reward by 1/implied_prob of the correct outcome "
+        "to encourage backing value bets (upsets)"
+    )
+
+    hypotheses = list(dict.fromkeys(hypotheses))[:4]  # deduplicate, keep 4
+
+    # Strategies not yet tried from PREDEFINED
+    all_predefined = [s.name for s in PREDEFINED]
+    not_tried = [s for s in all_predefined if s not in tried_strategies][:5]
+
+    return {
+        "improvement_number": len([e for e in board if e.get("commit_hash")]),
+        "trial": result.trial,
+        "strategy": result.strategy_name,
+        "keywords": result.keywords,
+        "policy": policy,
+        "score": round(result.score, 4),
+        "score_delta": round(score_delta, 4),
+        "val_net": result.val_net_per_round,
+        "val_hit_pct": round(result.val_round_hit_rate * 100, 1),
+        "test_net": result.test_net_per_round,
+        "test_hit_pct": round(result.test_round_hit_rate * 100, 1),
+        "timestamp": result.timestamp,
+        "key_change": key_change.strip(),
+        "what_worked": insights,
+        "hypotheses_for_next_agent": hypotheses,
+        "predefined_not_yet_tried": not_tried,
+        "total_trials_so_far": len(board),
+        "commit": "",  # filled after git_commit
+    }
+
+
+def save_summary(summary: dict) -> None:
+    summaries = load_summaries()
+    # Update existing entry for same improvement_number, or append
+    updated = False
+    for i, s in enumerate(summaries):
+        if s.get("improvement_number") == summary.get("improvement_number"):
+            summaries[i] = summary
+            updated = True
+            break
+    if not updated:
+        summaries.append(summary)
+    with open(SUMMARIES_PATH, "w") as f:
+        json.dump(summaries, f, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Improvement figures
+# ---------------------------------------------------------------------------
+
+def save_improvement_figures(board: list[dict]) -> None:
+    """
+    Save a 2-panel figure (improvement.png) showing each new best over time.
+
+    Panel 1: Val net P&L per round at each improvement step.
+    Panel 2: Val round hit rate % at each improvement step.
+    X-axis: improvement number (1, 2, 3, ...).
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    # Extract only entries that were bests (have a commit_hash = they were saved)
+    bests = [e for e in board if e.get("commit_hash")]
+    if not bests:
+        return
+
+    x = list(range(1, len(bests) + 1))
+    val_nets  = [e.get("val_net_per_round", e.get("test_net_per_round", 0)) for e in bests]
+    val_hits  = [e.get("val_round_hit_rate", e.get("test_round_hit_rate", 0)) * 100 for e in bests]
+    labels    = [e["strategy_name"] for e in bests]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+    fig.suptitle("Improvement over time (val set)", fontsize=13)
+
+    # Panel 1: val net/round as step function
+    ax1.step(x, val_nets, where="post", color="steelblue", linewidth=2)
+    ax1.scatter(x, val_nets, color="steelblue", zorder=5)
+    for i, (xi, y, lbl) in enumerate(zip(x, val_nets, labels)):
+        ax1.annotate(lbl, (xi, y), textcoords="offset points", xytext=(0, 6),
+                     ha="center", fontsize=7, rotation=45)
+    ax1.axhline(0, color="gray", linewidth=0.8, linestyle="--")
+    ax1.set_ylabel("Val net P&L / round ($)")
+    ax1.set_title("Net gain per round at each new best")
+    ax1.grid(True, alpha=0.3)
+
+    # Panel 2: val hit rate %
+    ax2.step(x, val_hits, where="post", color="darkorange", linewidth=2)
+    ax2.scatter(x, val_hits, color="darkorange", zorder=5)
+    for i, (xi, y, lbl) in enumerate(zip(x, val_hits, labels)):
+        ax2.annotate(lbl, (xi, y), textcoords="offset points", xytext=(0, 6),
+                     ha="center", fontsize=7, rotation=45)
+    ax2.set_ylabel("Val round hit rate (%)")
+    ax2.set_xlabel("Improvement #")
+    ax2.set_title("Rounds with ≥1 winning grid at each new best")
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(FIGURES_PATH, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
 # Git helpers
 # ---------------------------------------------------------------------------
 
 def git_commit(result: TrialResult) -> str:
     """Stage relevant files and commit. Returns the short commit hash."""
     try:
-        subprocess.run(["git", "add",
-                        BEST_MODEL_PATH, LEADERBOARD_PATH, CLAUDE_MD_PATH],
+        files = [BEST_MODEL_PATH, LEADERBOARD_PATH, SUMMARIES_PATH, CLAUDE_MD_PATH, FIGURES_PATH]
+        subprocess.run(["git", "add"] + [f for f in files if os.path.exists(f)],
                        check=True, capture_output=True)
         msg = (
             f"improve: [{result.strategy_name}] "
             f"score={result.score:+.2f} "
-            f"test_net={result.test_net_per_round:+.2f}/round "
-            f"hit={result.test_round_hit_rate*100:.0f}%\n\n"
+            f"val_net={result.val_net_per_round:+.2f}/round "
+            f"val_hit={result.val_round_hit_rate*100:.0f}%\n\n"
             f"Keywords: {', '.join(result.keywords)}\n"
-            f"Train rounds: {result.n_train_rounds}  Test rounds: {result.n_test_rounds}"
+            f"Train={result.n_train_rounds}  Val={result.n_val_rounds}  Test={result.n_test_rounds} rounds"
         )
         subprocess.run(["git", "commit", "-m", msg], check=True, capture_output=True)
         result_hash = subprocess.run(
@@ -302,7 +539,10 @@ def log(msg: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Autonomous RL strategy improver")
     parser.add_argument("--file",        type=str, default=EXCEL_FILE)
-    parser.add_argument("--test-grids",  type=int, default=4)
+    parser.add_argument("--val-ratio",   type=float, default=0.2,
+                        help="Fraction of data for validation (default: 0.2)")
+    parser.add_argument("--test-ratio",  type=float, default=0.2,
+                        help="Fraction of data for test (default: 0.2)")
     parser.add_argument("--max-trials",  type=int, default=0,
                         help="Stop after N trials (0 = run forever)")
     parser.add_argument("--seed",        type=int, default=42)
@@ -310,21 +550,33 @@ def main() -> None:
 
     # ── Load data ────────────────────────────────────────────────────────
     all_grids = load_data(args.file)
-    if len(all_grids) <= args.test_grids:
-        print(f"Not enough grids: {len(all_grids)} total, need > {args.test_grids}")
+    if len(all_grids) < 3:
+        print(f"Not enough grids: {len(all_grids)} total, need ≥ 3")
         sys.exit(1)
-    train_grids = all_grids[: len(all_grids) - args.test_grids]
-    test_grids  = all_grids[len(all_grids) - args.test_grids :]
-    n_matches   = all_grids[0]["n_matches"]
+    train_grids, val_grids, test_grids = split_data(
+        all_grids, val_ratio=args.val_ratio, test_ratio=args.test_ratio, seed=args.seed
+    )
+    n_matches = all_grids[0]["n_matches"]
 
-    log(f"Data: {len(all_grids)} rounds  train={len(train_grids)}  test={len(test_grids)}  "
-        f"n_matches={n_matches}")
+    log(f"Data: {len(all_grids)} rounds  train={len(train_grids)}  "
+        f"val={len(val_grids)}  test={len(test_grids)}  n_matches={n_matches}")
 
     # ── Load existing leaderboard ─────────────────────────────────────────
     board = load_leaderboard()
     current_best = best_score(board)
     trial_offset = len(board)
     log(f"Leaderboard: {len(board)} entries  current_best_score={current_best:.4f}")
+
+    # ── Print last agent summary for context ──────────────────────────────
+    summaries = load_summaries()
+    if summaries:
+        last = summaries[-1]
+        log(f"── Last improvement: #{last['improvement_number']} "
+            f"strategy={last['strategy']}  score={last['score']:+.4f}  "
+            f"val_net={last['val_net']:+.2f}")
+        log(f"   What worked : {'; '.join(last.get('what_worked', []))}")
+        for h in last.get("hypotheses_for_next_agent", []):
+            log(f"   → {h}")
 
     # ── Strategy iterator ────────────────────────────────────────────────
     rng = np.random.default_rng(args.seed + trial_offset)
@@ -354,28 +606,39 @@ def main() -> None:
             t0 = time.time()
 
             try:
-                agent, result = train_trial(strategy, train_grids, test_grids, trial, seed)
+                agent, result = train_trial(strategy, train_grids, val_grids, test_grids, trial, seed)
             except Exception as e:
                 log(f"   ERROR: {e}")
                 continue
 
             elapsed = time.time() - t0
             log(f"   score={result.score:+.4f}  "
+                f"val_net={result.val_net_per_round:+.2f}/round  "
+                f"val_hit={result.val_round_hit_rate*100:.0f}%  "
                 f"test_net={result.test_net_per_round:+.2f}/round  "
-                f"hit={result.test_round_hit_rate*100:.0f}%  "
-                f"train_net={result.train_net_per_round:+.2f}/round  "
+                f"test_hit={result.test_round_hit_rate*100:.0f}%  "
                 f"({elapsed:.0f}s)")
 
             board.append(asdict(result))
 
             if result.score > current_best:
+                prev_best_entry = next(
+                    (e for e in sorted(board[:-1], key=lambda x: x.get("score", -999), reverse=True)),
+                    None,
+                )
                 current_best = result.score
                 agent.save(BEST_MODEL_PATH)
+                save_improvement_figures(board)
+                summary = generate_improvement_summary(result, prev_best_entry, board)
                 commit_hash = git_commit(result)
                 board[-1]["commit_hash"] = commit_hash
+                summary["commit"] = commit_hash
+                save_summary(summary)
                 save_leaderboard(board)
                 update_claude_md(board)
                 log(f"   ★ NEW BEST  score={current_best:.4f}  commit={commit_hash}")
+                log(f"   Key change : {summary['key_change']}")
+                log(f"   Next ideas : {summary['hypotheses_for_next_agent'][0] if summary['hypotheses_for_next_agent'] else '—'}")
                 log(f"   ─────────────────────────────────────────────────────")
             else:
                 save_leaderboard(board)
@@ -388,9 +651,11 @@ def main() -> None:
     top5 = sorted(board, key=lambda e: e["score"], reverse=True)[:5]
     log("\n══ TOP 5 STRATEGIES ══════════════════════════════════")
     for i, e in enumerate(top5, 1):
+        val_net = e.get("val_net_per_round", e.get("test_net_per_round", 0))
+        val_hit = e.get("val_round_hit_rate", e.get("test_round_hit_rate", 0))
         log(f"  {i}. [{e['strategy_name']}]  score={e['score']:+.4f}  "
+            f"val_net={val_net:+.2f}  val_hit={val_hit*100:.0f}%  "
             f"test_net={e['test_net_per_round']:+.2f}  "
-            f"hit={e['test_round_hit_rate']*100:.0f}%  "
             f"keywords={e['keywords']}")
     log("══════════════════════════════════════════════════════")
 

@@ -3,7 +3,7 @@ train.py – REINFORCE agent training on LotoFootEnv.
 
 Usage:
     uv run python train.py
-    uv run python train.py --test-grids 4 --k-grids 30 --episodes 8000
+    uv run python train.py --val-ratio 0.2 --test-ratio 0.2 --k-grids 30 --episodes 8000
     uv run python train.py --help
 """
 
@@ -119,6 +119,33 @@ def load_data(
         print(f"Cutoff date: {cutoff_date}  ({before} → {len(grids)} rounds kept)")
 
     return grids
+
+
+def split_data(
+    grids: list[dict],
+    val_ratio: float = 0.2,
+    test_ratio: float = 0.2,
+    seed: int = 42,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """
+    Randomly split grids into train / val / test sets.
+
+    Returns (train_grids, val_grids, test_grids).
+    """
+    rng = np.random.default_rng(seed)
+    n = len(grids)
+    idx = rng.permutation(n)
+    n_test = max(1, round(n * test_ratio))
+    n_val  = max(1, round(n * val_ratio))
+    n_train = max(1, n - n_val - n_test)
+    train_idx = sorted(idx[:n_train])
+    val_idx   = sorted(idx[n_train : n_train + n_val])
+    test_idx  = sorted(idx[n_train + n_val :])
+    return (
+        [grids[i] for i in train_idx],
+        [grids[i] for i in val_idx],
+        [grids[i] for i in test_idx],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -539,8 +566,10 @@ def random_baseline(env: LotoFootEnv) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Loto Foot RL strategy trainer")
-    parser.add_argument("--test-grids", type=int, default=4,
-                        help="Most-recent grids held out for test (default: 4)")
+    parser.add_argument("--val-ratio",  type=float, default=0.2,
+                        help="Fraction of data for validation (default: 0.2)")
+    parser.add_argument("--test-ratio", type=float, default=0.2,
+                        help="Fraction of data for test (default: 0.2)")
     parser.add_argument("--k-grids",    type=int, default=20,
                         help="Max grids (combos) per round, max 50 (default: 20)")
     parser.add_argument("--episodes",   type=int, default=6000,
@@ -564,21 +593,21 @@ def main() -> None:
     all_grids = load_data(loto_type=args.loto_type, cutoff_date=args.cutoff_date)
     if not all_grids:
         raise ValueError(f"No complete grids found (loto_type={args.loto_type!r})")
-    if args.test_grids >= len(all_grids):
-        raise ValueError(
-            f"--test-grids {args.test_grids} must be < total grids ({len(all_grids)})"
-        )
-    train_grids = all_grids[: len(all_grids) - args.test_grids]
-    test_grids  = all_grids[len(all_grids) - args.test_grids :]
+
+    train_grids, val_grids, test_grids = split_data(
+        all_grids, val_ratio=args.val_ratio, test_ratio=args.test_ratio, seed=args.seed
+    )
 
     n_matches = all_grids[0]["n_matches"]
     ltype = all_grids[0]["loto_type"]
-    print(f"Type={ltype}  Rounds total={len(all_grids)}  train={len(train_grids)}  test={len(test_grids)}")
+    print(f"Type={ltype}  Rounds total={len(all_grids)}  "
+          f"train={len(train_grids)}  val={len(val_grids)}  test={len(test_grids)}")
     print(f"k_max={k}  episodes={args.episodes}  lr={args.lr}  entropy={args.entropy_coef}")
 
     # ---- Environments -------------------------------------------------------
     train_env      = LotoFootEnv(train_grids, k_max=k, mode="train")
     eval_train_env = LotoFootEnv(train_grids, k_max=k, mode="eval")
+    eval_val_env   = LotoFootEnv(val_grids,   k_max=k, mode="eval")
     eval_test_env  = LotoFootEnv(test_grids,  k_max=k, mode="eval")
 
     # ---- Agent --------------------------------------------------------------
@@ -604,6 +633,7 @@ def main() -> None:
 
     # ---- Evaluation ---------------------------------------------------------
     evaluate(agent, eval_train_env, f"TRAIN  ({len(train_grids)} rounds)")
+    evaluate(agent, eval_val_env,   f"VAL    ({len(val_grids)} rounds)")
     evaluate(agent, eval_test_env,  f"TEST   ({len(test_grids)} rounds)")
     random_baseline(eval_test_env)
 
