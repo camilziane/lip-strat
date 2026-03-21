@@ -10,10 +10,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import re
 import numpy as np
 import pandas as pd
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 from env import LotoFootEnv, N_OUTCOMES, N_FEATURES, COST_PER_GRID
 
@@ -156,20 +160,40 @@ def split_data(
 
 
 # ---------------------------------------------------------------------------
-# REINFORCE agent  (linear policy, numpy-only, system-bet / binary mask)
+# REINFORCE agent  (PyTorch policy, system-bet / binary mask)
 # ---------------------------------------------------------------------------
 
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x.astype(np.float64)))
+class _PolicyNet(nn.Module):
+    """Linear or one-hidden-layer MLP policy network."""
+
+    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 0):
+        super().__init__()
+        if hidden_dim > 0:
+            self.net = nn.Sequential(
+                nn.Linear(obs_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, action_dim),
+            )
+            nn.init.kaiming_uniform_(self.net[0].weight, nonlinearity="relu")
+            nn.init.zeros_(self.net[0].bias)
+            nn.init.normal_(self.net[2].weight, std=math.sqrt(2.0 / hidden_dim))
+            nn.init.zeros_(self.net[2].bias)
+        else:
+            self.net = nn.Linear(obs_dim, action_dim)
+            nn.init.normal_(self.net.weight, std=0.01)
+            nn.init.zeros_(self.net.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
 
 
 class REINFORCEAgent:
     """
-    Linear policy: logits = W @ obs + b  →  (n_matches, 3) independent Bernoulli.
-    Each outcome is independently selected (sigmoid output) to form a system bet.
-    Updated via REINFORCE with a mean-reward baseline + entropy regularisation.
+    REINFORCE policy agent backed by PyTorch autograd.
 
-    Works for any grid size (7, 8, 12, 15 matches).
+    Supports linear (hidden_dim=0) and one-hidden-layer MLP (hidden_dim>0).
+    Action: (n_matches, 3) independent Bernoulli — system bet with k_max cap.
+    Updated via REINFORCE + entropy regularisation using Adam.
     """
 
     def __init__(
@@ -179,17 +203,32 @@ class REINFORCEAgent:
         lr: float = 0.005,
         entropy_coef: float = 0.05,
         seed: int = 42,
+        hidden_dim: int = 0,
     ):
-        self.n_matches = n_matches
-        self.k_max = k_max
-        self.obs_dim = n_matches * N_FEATURES
-        self.action_dim = n_matches * N_OUTCOMES
-        rng = np.random.default_rng(seed)
-        self.W = rng.standard_normal((self.action_dim, self.obs_dim)).astype(np.float32) * 0.01
-        self.b = np.zeros(self.action_dim, dtype=np.float32)
-        self.lr = lr
+        self.n_matches    = n_matches
+        self.k_max        = k_max
+        self.obs_dim      = n_matches * N_FEATURES
+        self.action_dim   = n_matches * N_OUTCOMES
+        self.lr           = lr
         self.entropy_coef = entropy_coef
-        self._rng = rng
+        self.hidden_dim   = hidden_dim
+
+        torch.manual_seed(seed)
+        self.policy    = _PolicyNet(self.obs_dim, self.action_dim, hidden_dim)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        self._rng      = np.random.default_rng(seed)
+
+    # ------------------------------------------------------------------
+    # Action
+    # ------------------------------------------------------------------
+
+    def get_probs(self, obs: np.ndarray) -> np.ndarray:
+        """Return (n_matches, 3) sigmoid probabilities for an observation."""
+        with torch.no_grad():
+            x = torch.tensor(obs, dtype=torch.float32)
+            logits = self.policy(x)
+            probs  = torch.sigmoid(logits).numpy()
+        return probs.reshape(self.n_matches, N_OUTCOMES)
 
     def act(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
         """
@@ -199,171 +238,7 @@ class REINFORCEAgent:
         Deterministic: threshold at 0.5.
         Ensures at least 1 outcome per match, then prunes to k_max combos.
         """
-        logits = (self.W @ obs + self.b).astype(np.float64)  # (action_dim,)
-        probs = _sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)  # (n_matches, 3)
-
-        if deterministic:
-            mask = (probs > 0.5).astype(np.float32)
-        else:
-            rand = self._rng.random((self.n_matches, N_OUTCOMES))
-            mask = (rand < probs).astype(np.float32)
-
-        # Ensure at least 1 per match
-        for m in range(self.n_matches):
-            if not mask[m].any():
-                mask[m, int(probs[m].argmax())] = 1.0
-
-        # Prune to k_max: while product > k_max, remove the selected outcome
-        # with the lowest probability in the match that has multiple selections.
-        import math
-        def n_combos(m):
-            return math.prod(int(mask[i].sum()) for i in range(self.n_matches))
-
-        while n_combos(mask) > self.k_max:
-            best_match = -1
-            best_val = np.inf
-            best_outcome = -1
-            for m in range(self.n_matches):
-                sel_outcomes = [o for o in range(N_OUTCOMES) if mask[m, o] > 0.5]
-                if len(sel_outcomes) <= 1:
-                    continue
-                for o in sel_outcomes:
-                    if probs[m, o] < best_val:
-                        best_val = probs[m, o]
-                        best_match = m
-                        best_outcome = o
-            if best_match == -1:
-                break
-            mask[best_match, best_outcome] = 0.0
-
-        return mask.flatten().astype(np.float32)
-
-    def update(
-        self,
-        obs: np.ndarray,
-        action: np.ndarray,
-        per_combo_rewards: np.ndarray,  # (n_combos,) from info dict
-        selections: np.ndarray,         # (n_matches, 3) bool from info dict
-    ) -> None:
-        """REINFORCE update over all system-bet combos from the episode."""
-        baseline = float(per_combo_rewards.mean())
-
-        logits = (self.W @ obs + self.b).astype(np.float64)
-        probs = _sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)  # (n_matches, 3)
-
-        grad_W = np.zeros_like(self.W, dtype=np.float64)
-        grad_b = np.zeros_like(self.b, dtype=np.float64)
-
-        # Average advantage across all combos in this episode
-        advantage = float(per_combo_rewards.mean()) - baseline  # = 0, so use per-combo
-        # REINFORCE: for each outcome (m, o), the log-prob gradient is:
-        # (b - sigma) * advantage, where b = selections[m, o]
-        # We average advantage over per_combo_rewards vs baseline.
-        avg_advantage = float(per_combo_rewards.mean() - baseline)
-        # Better: use mean of advantages directly
-        advantages = per_combo_rewards - baseline  # (n_combos,)
-        mean_advantage = float(advantages.mean()) if len(advantages) > 0 else 0.0
-
-        for m in range(self.n_matches):
-            for o in range(N_OUTCOMES):
-                b_mo = float(selections[m, o])
-                sigma = probs[m, o]
-                grad_logit = (b_mo - sigma) * mean_advantage
-                s_idx = m * N_OUTCOMES + o
-                grad_W[s_idx] += grad_logit * obs
-                grad_b[s_idx] += grad_logit
-
-        # Entropy regularisation for Bernoulli: H = -p*log(p) - (1-p)*log(1-p)
-        # dH/d_logit = (log(1-p) - log(p)) * p * (1-p)  ... simplifies to:
-        # dH/d_sigma = log(1-p) - log(p), dH/d_logit = dH/d_sigma * sigma*(1-sigma)
-        if self.entropy_coef > 0:
-            for m in range(self.n_matches):
-                for o in range(N_OUTCOMES):
-                    p = probs[m, o]
-                    p = np.clip(p, 1e-7, 1 - 1e-7)
-                    entropy_grad_logit = (np.log(1 - p) - np.log(p)) * p * (1 - p)
-                    s_idx = m * N_OUTCOMES + o
-                    grad_W[s_idx] += self.entropy_coef * entropy_grad_logit * obs
-                    grad_b[s_idx] += self.entropy_coef * entropy_grad_logit
-
-        n = max(len(per_combo_rewards), 1)
-        self.W += (self.lr * grad_W / n).astype(np.float32)
-        self.b += (self.lr * grad_b / n).astype(np.float32)
-
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
-
-    def save(self, path: str) -> None:
-        """Save agent weights and hyperparameters to a .npz file."""
-        np.savez(
-            path,
-            W=self.W,
-            b=self.b,
-            n_matches=np.int32(self.n_matches),
-            k_max=np.int32(self.k_max),
-            lr=np.float32(self.lr),
-            entropy_coef=np.float32(self.entropy_coef),
-        )
-        print(f"Agent saved → {path}")
-
-    @classmethod
-    def load(cls, path: str) -> "REINFORCEAgent":
-        """Load a linear or MLP agent from a .npz file (dispatches to subclass)."""
-        data = np.load(path)
-        if "W1" in data:
-            return MLPREINFORCEAgent.load(path)
-        k_max = int(data["k_max"]) if "k_max" in data else 20
-        agent = cls(
-            n_matches=int(data["n_matches"]),
-            k_max=k_max,
-            lr=float(data["lr"]),
-            entropy_coef=float(data["entropy_coef"]),
-        )
-        agent.W = data["W"]
-        agent.b = data["b"]
-        return agent
-
-
-class MLPREINFORCEAgent(REINFORCEAgent):
-    """
-    One-hidden-layer MLP policy: obs → ReLU(W1@obs+b1) → W2@h+b2 → logits.
-    Inherits act(), update(), save(), load() interface from REINFORCEAgent.
-    """
-
-    def __init__(
-        self,
-        n_matches: int,
-        hidden_dim: int = 64,
-        k_max: int = 20,
-        lr: float = 0.005,
-        entropy_coef: float = 0.05,
-        seed: int = 42,
-    ):
-        # Initialise base class but override W/b with MLP weights
-        super().__init__(n_matches=n_matches, k_max=k_max,
-                         lr=lr, entropy_coef=entropy_coef, seed=seed)
-        self.hidden_dim = hidden_dim
-        rng = np.random.default_rng(seed)
-        scale1 = np.sqrt(2.0 / self.obs_dim)
-        scale2 = np.sqrt(2.0 / hidden_dim)
-        self.W1 = (rng.standard_normal((hidden_dim, self.obs_dim)) * scale1).astype(np.float32)
-        self.b1 = np.zeros(hidden_dim, dtype=np.float32)
-        self.W2 = (rng.standard_normal((self.action_dim, hidden_dim)) * scale2).astype(np.float32)
-        self.b2 = np.zeros(self.action_dim, dtype=np.float32)
-        # Remove linear weights from base (not used)
-        del self.W, self.b
-
-    def _forward(self, obs: np.ndarray):
-        """Forward pass; returns (logits, hidden_pre, hidden)."""
-        h_pre = self.W1 @ obs.astype(np.float64) + self.b1
-        h = np.maximum(0.0, h_pre)               # ReLU
-        logits = self.W2 @ h + self.b2
-        return logits, h_pre, h
-
-    def act(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
-        logits, _, _ = self._forward(obs)
-        probs = _sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)
+        probs = self.get_probs(obs)
 
         if deterministic:
             mask = (probs > 0.5).astype(np.float32)
@@ -375,7 +250,6 @@ class MLPREINFORCEAgent(REINFORCEAgent):
             if not mask[m].any():
                 mask[m, int(probs[m].argmax())] = 1.0
 
-        import math
         while math.prod(int(mask[m].sum()) for m in range(self.n_matches)) > self.k_max:
             best_m, best_o, best_val = -1, -1, np.inf
             for m in range(self.n_matches):
@@ -391,84 +265,123 @@ class MLPREINFORCEAgent(REINFORCEAgent):
 
         return mask.flatten().astype(np.float32)
 
+    # ------------------------------------------------------------------
+    # Update
+    # ------------------------------------------------------------------
+
     def update(
         self,
         obs: np.ndarray,
         action: np.ndarray,
-        per_combo_rewards: np.ndarray,
-        selections: np.ndarray,
+        per_combo_rewards: np.ndarray,  # (n_combos,) from info dict
+        selections: np.ndarray,         # (n_matches, 3) bool from info dict
     ) -> None:
-        baseline = float(per_combo_rewards.mean())
-        mean_advantage = float(per_combo_rewards.mean() - baseline)  # = 0; use raw mean
-        mean_advantage = float(per_combo_rewards.mean())             # use mean reward as signal
+        """REINFORCE update via autograd: log-prob gradient + entropy bonus."""
+        baseline  = float(per_combo_rewards.mean())
+        advantage = float((per_combo_rewards - baseline).mean())
 
-        logits, h_pre, h = self._forward(obs)
-        probs = _sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)
+        x      = torch.tensor(obs, dtype=torch.float32)
+        logits = self.policy(x)
+        probs  = torch.sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)
 
-        # Gradient of Bernoulli log-prob w.r.t. logits: (b - sigma) * advantage
-        grad_logits = np.zeros(self.action_dim, dtype=np.float64)
-        advantages = per_combo_rewards - baseline
-        adv = float(advantages.mean())
+        sel_t = torch.tensor(selections, dtype=torch.float32)
+        # Bernoulli log-prob: b*log(p) + (1-b)*log(1-p)
+        log_prob = (
+            sel_t * torch.log(probs.clamp(1e-8, 1 - 1e-8))
+            + (1 - sel_t) * torch.log((1 - probs).clamp(1e-8, 1 - 1e-8))
+        ).sum()
 
-        for m in range(self.n_matches):
-            for o in range(N_OUTCOMES):
-                b_mo = float(selections[m, o])
-                sigma = probs[m, o]
-                grad_logits[m * N_OUTCOMES + o] = (b_mo - sigma) * adv
+        # Bernoulli entropy: -p*log(p) - (1-p)*log(1-p)
+        p_c     = probs.clamp(1e-7, 1 - 1e-7)
+        entropy = -(p_c * torch.log(p_c) + (1 - p_c) * torch.log(1 - p_c)).sum()
 
-        # Entropy bonus
-        if self.entropy_coef > 0:
-            for m in range(self.n_matches):
-                for o in range(N_OUTCOMES):
-                    p = np.clip(probs[m, o], 1e-7, 1 - 1e-7)
-                    grad_logits[m * N_OUTCOMES + o] += (
-                        self.entropy_coef * (np.log(1 - p) - np.log(p)) * p * (1 - p)
-                    )
+        n    = max(len(per_combo_rewards), 1)
+        loss = -(advantage * log_prob + self.entropy_coef * entropy) / n
 
-        # Backprop through W2
-        grad_W2 = np.outer(grad_logits, h)
-        grad_b2 = grad_logits.copy()
-        grad_h = self.W2.T @ grad_logits
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
-        # Backprop through ReLU + W1
-        grad_h_pre = grad_h * (h_pre > 0)
-        obs64 = obs.astype(np.float64)
-        grad_W1 = np.outer(grad_h_pre, obs64)
-        grad_b1 = grad_h_pre.copy()
-
-        n = max(len(per_combo_rewards), 1)
-        self.W2 += (self.lr * grad_W2 / n).astype(np.float32)
-        self.b2 += (self.lr * grad_b2 / n).astype(np.float32)
-        self.W1 += (self.lr * grad_W1 / n).astype(np.float32)
-        self.b1 += (self.lr * grad_b1 / n).astype(np.float32)
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
 
     def save(self, path: str) -> None:
-        np.savez(
-            path,
-            W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
-            n_matches=np.int32(self.n_matches),
-            hidden_dim=np.int32(self.hidden_dim),
-            k_max=np.int32(self.k_max),
-            lr=np.float32(self.lr),
-            entropy_coef=np.float32(self.entropy_coef),
-        )
-        print(f"MLP agent saved → {path}")
+        """Save weights and hyperparameters to a .npz file."""
+        data: dict = {
+            "n_matches":    np.int32(self.n_matches),
+            "k_max":        np.int32(self.k_max),
+            "lr":           np.float32(self.lr),
+            "entropy_coef": np.float32(self.entropy_coef),
+            "hidden_dim":   np.int32(self.hidden_dim),
+        }
+        for k, v in self.policy.state_dict().items():
+            data[f"p_{k}"] = v.numpy()
+        np.savez(path, **data)
+        print(f"Agent saved → {path}")
 
     @classmethod
-    def load(cls, path: str) -> "MLPREINFORCEAgent":
+    def load(cls, path: str) -> "REINFORCEAgent":
+        """Load agent from a .npz file (new torch format or legacy numpy format)."""
         data = np.load(path)
-        agent = cls(
-            n_matches=int(data["n_matches"]),
-            hidden_dim=int(data["hidden_dim"]),
-            k_max=int(data["k_max"]) if "k_max" in data else 20,
-            lr=float(data["lr"]),
-            entropy_coef=float(data["entropy_coef"]),
-        )
-        agent.W1 = data["W1"]
-        agent.b1 = data["b1"]
-        agent.W2 = data["W2"]
-        agent.b2 = data["b2"]
+        keys = set(data.keys())
+
+        # ── New torch format ─────────────────────────────────────────────
+        if "hidden_dim" in keys and any(k.startswith("p_") for k in keys):
+            agent = cls(
+                n_matches=int(data["n_matches"]),
+                k_max=int(data["k_max"]),
+                lr=float(data["lr"]),
+                entropy_coef=float(data["entropy_coef"]),
+                hidden_dim=int(data["hidden_dim"]),
+            )
+            sd = {k[2:]: torch.tensor(data[k]) for k in keys if k.startswith("p_")}
+            agent.policy.load_state_dict(sd)
+            return agent
+
+        # ── Legacy numpy format (linear: W/b, mlp: W1/b1/W2/b2) ─────────
+        k_max = int(data["k_max"]) if "k_max" in keys else 20
+        if "W1" in keys:
+            hidden_dim = int(data["hidden_dim"]) if "hidden_dim" in keys else int(data["W1"].shape[0])
+            agent = cls(
+                n_matches=int(data["n_matches"]), k_max=k_max,
+                lr=float(data["lr"]), entropy_coef=float(data["entropy_coef"]),
+                hidden_dim=hidden_dim,
+            )
+            sd = agent.policy.state_dict()
+            sd["net.0.weight"] = torch.tensor(data["W1"])
+            sd["net.0.bias"]   = torch.tensor(data["b1"])
+            sd["net.2.weight"] = torch.tensor(data["W2"])
+            sd["net.2.bias"]   = torch.tensor(data["b2"])
+        else:
+            agent = cls(
+                n_matches=int(data["n_matches"]), k_max=k_max,
+                lr=float(data["lr"]), entropy_coef=float(data["entropy_coef"]),
+                hidden_dim=0,
+            )
+            sd = agent.policy.state_dict()
+            sd["net.weight"] = torch.tensor(data["W"])
+            sd["net.bias"]   = torch.tensor(data["b"])
+        agent.policy.load_state_dict(sd)
         return agent
+
+
+class MLPREINFORCEAgent(REINFORCEAgent):
+    """Backward-compatible alias: MLP agent with explicit hidden_dim argument."""
+
+    def __init__(
+        self,
+        n_matches: int,
+        hidden_dim: int = 64,
+        k_max: int = 20,
+        lr: float = 0.005,
+        entropy_coef: float = 0.05,
+        seed: int = 42,
+    ):
+        super().__init__(
+            n_matches=n_matches, k_max=k_max, lr=lr,
+            entropy_coef=entropy_coef, seed=seed, hidden_dim=hidden_dim,
+        )
 
 
 # ---------------------------------------------------------------------------

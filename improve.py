@@ -161,18 +161,15 @@ def build_agent(strategy: Strategy, n_matches: int, seed: int) -> REINFORCEAgent
 def _warm_start(agent: REINFORCEAgent, init_model_path: str) -> None:
     """Copy weights from init_model_path into agent (best-effort, silent on mismatch)."""
     try:
-        src = REINFORCEAgent.load(init_model_path)
-        if isinstance(agent, MLPREINFORCEAgent) and isinstance(src, MLPREINFORCEAgent):
-            if agent.W1.shape == src.W1.shape and agent.W2.shape == src.W2.shape:
-                agent.W1[:] = src.W1; agent.b1[:] = src.b1
-                agent.W2[:] = src.W2; agent.b2[:] = src.b2
-                return
-        elif not isinstance(agent, MLPREINFORCEAgent) and not isinstance(src, MLPREINFORCEAgent):
-            if agent.W.shape == src.W.shape:
-                agent.W[:] = src.W; agent.b[:] = src.b
-                return
-        log(f"   Warm-start skipped: architecture mismatch "
-            f"({type(src).__name__} → {type(agent).__name__})")
+        src    = REINFORCEAgent.load(init_model_path)
+        src_sd = src.policy.state_dict()
+        dst_sd = agent.policy.state_dict()
+        if (set(src_sd.keys()) == set(dst_sd.keys())
+                and all(src_sd[k].shape == dst_sd[k].shape for k in src_sd)):
+            agent.policy.load_state_dict(src_sd)
+        else:
+            log(f"   Warm-start skipped: architecture mismatch "
+                f"(hidden={src.hidden_dim} → {agent.hidden_dim})")
     except Exception as e:
         log(f"   Warm-start failed: {e}")
 

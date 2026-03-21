@@ -95,9 +95,7 @@ def load_rounds(path: str, loto_type: str | None = None) -> list[dict]:
 def agent_probs(agent: REINFORCEAgent, round_: dict) -> np.ndarray:
     """Return (n_matches, 3) probability matrix for a round (sigmoid, not softmax)."""
     obs = make_obs(round_)
-    logits = (agent.W @ obs + agent.b).astype(np.float64)
-    probs = 1.0 / (1.0 + np.exp(-logits))
-    return probs.reshape(round_["n_matches"], N_OUTCOMES).astype(np.float32)
+    return agent.get_probs(obs).astype(np.float32)
 
 
 def print_round_prediction(
