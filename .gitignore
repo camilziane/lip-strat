@@ -1,20 +1,43 @@
-# Python
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
-*.py[oc]
+*.py[cod]
+*.pyo
+*.pyd
+.Python
 build/
 dist/
 wheels/
-*.egg-info
-.venv
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-# Data files (large, not versioned)
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── uv ───────────────────────────────────────────────────────────────────────
+# uv.lock is intentionally tracked (reproducible installs)
+
+# ── Data files (large, not versioned) ────────────────────────────────────────
 *.xlsx
 *.xls
 *.csv
 
-# Keep best model and all saved agents
-# agent_best.npz  ← tracked
-# agent*.npz      ← tracked
+# ── Trained models ───────────────────────────────────────────────────────────
+# agent_best.npz  ← intentionally tracked
+*.npz
+!agent_best.npz
 
-# Logs (optional — comment out to track them)
-# improve.log
+# ── Logs ─────────────────────────────────────────────────────────────────────
+improve.log
+*.log
+
+# ── OS / editor ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
