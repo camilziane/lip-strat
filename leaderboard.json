@@ -1,0 +1,22 @@
+[
+  {
+    "trial": 1,
+    "strategy_name": "baseline",
+    "keywords": [
+      "linear",
+      "lr=0.005",
+      "entropy=0.05",
+      "k=20",
+      "ep=6k"
+    ],
+    "test_net_per_round": -15.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -14.5,
+    "n_test_rounds": 4,
+    "n_train_rounds": 8,
+    "score": -15.0,
+    "model_path": "agent_best.npz",
+    "timestamp": "2026-03-21 15:51",
+    "commit_hash": ""
+  }
+]
