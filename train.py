@@ -83,13 +83,19 @@ def load_data(
         ltype = str(gdf["loto_type_name"].iloc[0])
 
         features_raw = []
-        outcomes = []
+        outcomes     = []
+        match_info   = []
         for _, row in gdf.iterrows():
             features_raw.extend([
                 row["Cote 1"], row["Cote 2"], row["Cote 3"],
-                row["Rep 1"], row["Rep 2"], row["Rep 3"],
+                row["Rep 1"],  row["Rep 2"],  row["Rep 3"],
             ])
             outcomes.append(_outcome(row["Score"]))
+            match_info.append({
+                "home":  str(row.get("home_team", "?")),
+                "away":  str(row.get("away_team", "?")),
+                "score": str(row.get("Score", "")),
+            })
 
         # Build prize dict: {n_correct → prize_amount}, skip zero-prize ranks
         # rang1 → n_matches correct, rang2 → n_matches-1 correct, etc.
@@ -102,13 +108,14 @@ def load_data(
                 prizes[n_matches - i] = val
 
         grids.append({
-            "grid_index": gid,
-            "date": gdf["date"].iloc[0],
-            "loto_type": ltype,
-            "n_matches": n_matches,
+            "grid_index":  gid,
+            "date":        gdf["date"].iloc[0],
+            "loto_type":   ltype,
+            "n_matches":   n_matches,
             "features_raw": features_raw,
-            "outcomes": np.array(outcomes, dtype=np.int32),
-            "prizes": prizes,
+            "outcomes":    np.array(outcomes, dtype=np.int32),
+            "prizes":      prizes,
+            "match_info":  match_info,
         })
 
     grids.sort(key=lambda x: x["date"])

@@ -63,6 +63,120 @@ def _stop_training() -> dict:
             return {"ok": False, "error": str(e)}
 
 
+# ── Prediction cache ──────────────────────────────────────────────────────────
+_pred_cache: dict = {"mtime": None, "data": None}
+
+
+def build_predictions() -> dict:
+    """Run agent_best.npz on val + test grids and return per-round predictions."""
+    agent_path = "agent_best.npz"
+    mtime = os.path.getmtime(agent_path) if os.path.exists(agent_path) else None
+    if _pred_cache["mtime"] == mtime and _pred_cache["data"] is not None:
+        return _pred_cache["data"]
+
+    if mtime is None:
+        return {"val": [], "test": [], "n_train": 0, "n_val": 0, "n_test": 0,
+                "error": "No agent_best.npz found yet"}
+    try:
+        import itertools
+        import sys
+        sys.path.insert(0, os.getcwd())
+        from train import REINFORCEAgent, load_data, split_data, EXCEL_FILE
+        from env import make_obs, N_OUTCOMES
+
+        all_grids = load_data(EXCEL_FILE)
+        if not all_grids:
+            return {"val": [], "test": [], "n_train": 0, "n_val": 0, "n_test": 0,
+                    "error": "No grids loaded"}
+
+        train_grids, val_grids, test_grids = split_data(
+            all_grids, val_ratio=0.2, test_ratio=0.2, seed=42
+        )
+        agent = REINFORCEAgent.load(agent_path)
+
+        def predict_rounds(grids: list) -> list:
+            rounds_out = []
+            for grid in grids:
+                obs  = make_obs(grid)
+                mask = agent.act(obs, deterministic=True)
+                sel  = mask.reshape(grid["n_matches"], N_OUTCOMES).astype(bool)
+
+                counts   = [int(sel[m].sum()) for m in range(grid["n_matches"])]
+                n_combos = 1
+                for c in counts:
+                    n_combos *= c
+
+                outcomes = grid["outcomes"]
+                prizes   = grid["prizes"]
+
+                # Evaluate all combos
+                sel_idx    = [[o for o in range(N_OUTCOMES) if sel[m, o]]
+                              for m in range(grid["n_matches"])]
+                total_earn = 0.0
+                best_rank  = None
+                for combo in itertools.product(*sel_idx):
+                    correct = int(sum(c == o for c, o in zip(combo, outcomes)))
+                    if correct in prizes:
+                        total_earn += prizes[correct]
+                        rank_idx = sorted(prizes.keys(), reverse=True).index(correct) + 1
+                        if best_rank is None or rank_idx < best_rank:
+                            best_rank = rank_idx
+
+                net = total_earn - n_combos * 1.0
+
+                raw = grid["features_raw"]
+                mi  = grid.get("match_info", [{}] * grid["n_matches"])
+                matches_out = []
+                for m in range(grid["n_matches"]):
+                    base = m * 6
+                    c1, cn, c2, r1, rn, r2 = raw[base:base + 6]
+                    actual = int(outcomes[m])
+                    matches_out.append({
+                        "idx":    m + 1,
+                        "home":   mi[m].get("home", "?"),
+                        "away":   mi[m].get("away", "?"),
+                        "score":  mi[m].get("score", ""),
+                        "sel":    [bool(sel[m, 0]), bool(sel[m, 1]), bool(sel[m, 2])],
+                        "actual": actual,
+                        "cote1":  round(float(c1), 2),
+                        "coteN":  round(float(cn), 2),
+                        "cote2":  round(float(c2), 2),
+                        "rep1":   round(float(r1), 1),
+                        "repN":   round(float(rn), 1),
+                        "rep2":   round(float(r2), 1),
+                    })
+
+                rounds_out.append({
+                    "grid_index":  int(grid["grid_index"]),
+                    "date":        str(grid["date"])[:10],
+                    "n_matches":   grid["n_matches"],
+                    "n_combos":    n_combos,
+                    "formula":     " × ".join(str(c) for c in counts) + f" = {n_combos}",
+                    "earnings":    round(total_earn, 2),
+                    "net":         round(net, 2),
+                    "hit":         total_earn > 0,
+                    "best_rank":   best_rank,
+                    "prizes":      {str(k): v for k, v in prizes.items()},
+                    "matches":     matches_out,
+                })
+            return rounds_out
+
+        data = {
+            "val":     predict_rounds(val_grids),
+            "test":    predict_rounds(test_grids),
+            "n_train": len(train_grids),
+            "n_val":   len(val_grids),
+            "n_test":  len(test_grids),
+        }
+        _pred_cache["mtime"] = mtime
+        _pred_cache["data"]  = data
+        return data
+
+    except Exception as e:
+        return {"val": [], "test": [], "n_train": 0, "n_val": 0, "n_test": 0,
+                "error": str(e)}
+
+
 # ── Data helpers ──────────────────────────────────────────────────────────────
 
 def _load_json(path: str) -> list:
@@ -159,6 +273,11 @@ def build_api_data() -> dict:
             except Exception:
                 pass
 
+    # pull split sizes from the best leaderboard entry (written by improve.py)
+    n_train = best_entry.get("n_train_rounds", 0) if best_entry else 0
+    n_val   = best_entry.get("n_val_rounds",   0) if best_entry else 0
+    n_test  = best_entry.get("n_test_rounds",  0) if best_entry else 0
+
     stats = {
         "total_trials":        len(board),
         "total_bests":         len(bests),
@@ -168,6 +287,9 @@ def build_api_data() -> dict:
         "best_val_hit":        round(best_entry.get("val_round_hit_rate", best_entry.get("test_round_hit_rate", 0)) * 100, 1) if best_entry else 0,
         "best_test_net":       round(best_entry.get("test_net_per_round", 0), 2) if best_entry else 0,
         "best_test_hit":       round(best_entry.get("test_round_hit_rate", 0) * 100, 1) if best_entry else 0,
+        "n_train":             n_train,
+        "n_val":               n_val,
+        "n_test":              n_test,
         "training_elapsed_s":  training_elapsed_s,
         "is_running":          _is_running(),
         "pid":                 _proc.pid if _proc and _proc.poll() is None else None,
@@ -261,6 +383,40 @@ tr:hover td{background:var(--card2);}
 .badge-best{background:rgba(63,185,80,.2);color:var(--green);}
 .mono{font-family:'Cascadia Code','Fira Code',monospace;}
 
+/* ── split pills ── */
+.split-pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;
+  border-radius:12px;border:1px solid var(--border);}
+.split-pill.train{background:rgba(88,166,255,.12);color:var(--blue);}
+.split-pill.val{background:rgba(63,185,80,.12);color:var(--green);}
+.split-pill.test{background:rgba(240,136,62,.12);color:var(--orange);}
+
+/* ── prediction section ── */
+.pred-tabs{display:flex;gap:8px;margin-bottom:12px;}
+.pred-tab{padding:5px 16px;border-radius:6px;border:1px solid var(--border);
+  cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:var(--muted);}
+.pred-tab.active{background:var(--card2);color:var(--text);border-color:var(--blue);}
+.pred-rounds{display:flex;flex-direction:column;gap:10px;}
+.pred-round{background:var(--card2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.pred-round-header{display:flex;align-items:center;gap:14px;padding:9px 14px;
+  background:#1c2128;border-bottom:1px solid var(--border);flex-wrap:wrap;cursor:pointer;}
+.pred-round-header:hover{background:#21262d;}
+.pred-round-body{padding:0;}
+.pred-match-table{width:100%;border-collapse:collapse;font-size:12px;}
+.pred-match-table th{color:var(--muted);font-size:10px;text-transform:uppercase;
+  letter-spacing:.06em;padding:5px 8px;border-bottom:1px solid var(--border);
+  background:var(--card2);text-align:center;}
+.pred-match-table th.left{text-align:left;}
+.pred-match-table td{padding:5px 8px;border-bottom:1px solid #21262d;text-align:center;}
+.pred-match-table tr:last-child td{border-bottom:none;}
+.pred-match-table td.left{text-align:left;}
+
+/* outcome cells */
+.oc{width:52px;font-size:11px;font-weight:600;border-radius:4px;padding:2px 4px;}
+.oc-sel-hit{background:rgba(63,185,80,.25);color:var(--green);}  /* selected + correct */
+.oc-sel-miss{background:rgba(248,81,73,.18);color:var(--red);}   /* selected + wrong */
+.oc-actual{background:rgba(240,136,62,.2);color:var(--orange);border:1px dashed var(--orange);} /* actual, not selected (missed) */
+.oc-none{color:#444;}                                              /* not selected, not actual */
+
 /* ── log ── */
 .log-box{background:#010409;border:1px solid var(--border);border-radius:6px;
   font-family:monospace;font-size:11.5px;padding:10px 12px;
@@ -333,6 +489,18 @@ tr:hover td{background:var(--card2);}
   </div>
 </div>
 
+<!-- Data split banner -->
+<div class="grid" style="padding-bottom:0;">
+  <div class="card" style="padding:10px 16px;">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-right:4px;">Data split</span>
+      <span class="split-pill train" id="splitTrain">Train: — rounds</span>
+      <span class="split-pill val"   id="splitVal">Val: — rounds</span>
+      <span class="split-pill test"  id="splitTest">Test: — rounds</span>
+    </div>
+  </div>
+</div>
+
 <!-- Charts row 1: net P&L -->
 <div class="grid grid-2">
   <div class="card">
@@ -394,6 +562,24 @@ tr:hover td{background:var(--card2);}
       <tbody></tbody>
     </table>
     </div>
+  </div>
+</div>
+
+<!-- Predictions -->
+<div class="grid">
+  <div class="card">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Model predictions — best agent on val &amp; test rounds</span>
+      <button class="btn" style="background:var(--card2);color:var(--text);border:1px solid var(--border);padding:3px 10px;"
+              onclick="loadPredictions()">↺ Refresh</button>
+    </div>
+    <div class="pred-tabs">
+      <button class="pred-tab active" id="tabVal"  onclick="showPredTab('val')">Val set</button>
+      <button class="pred-tab"        id="tabTest" onclick="showPredTab('test')">Test set</button>
+    </div>
+    <div id="predVal"  class="pred-rounds"></div>
+    <div id="predTest" class="pred-rounds" style="display:none;"></div>
+    <div id="predError" style="color:var(--muted);font-size:12px;display:none;"></div>
   </div>
 </div>
 
@@ -598,6 +784,13 @@ function render(d) {
     ? `${(stats.total_trials/(stats.training_elapsed_s/3600)).toFixed(1)} trials/hr`
     : '—';
 
+  // Data split pills
+  if (stats.n_train || stats.n_val || stats.n_test) {
+    document.getElementById('splitTrain').textContent = `Train: ${stats.n_train} rounds`;
+    document.getElementById('splitVal').textContent   = `Val: ${stats.n_val} rounds`;
+    document.getElementById('splitTest').textContent  = `Test: ${stats.n_test} rounds`;
+  }
+
   // Charts: net & hit rate (val + test)
   const labels = improvement_series.map((e,i) => `#${i+1} ${e.strategy}`);
   chartNet.data.labels = labels;
@@ -675,12 +868,131 @@ function render(d) {
   prevLogLen = log_tail.length;
 }
 
+// ── Predictions ──────────────────────────────────────────────────────────────
+const OUTCOME_LABEL = ['1 (home)', 'N (draw)', '2 (away)'];
+const OUTCOME_SHORT = ['1', 'N', '2'];
+
+function ocClass(selected, isActual) {
+  if (selected && isActual)  return 'oc oc-sel-hit';
+  if (selected && !isActual) return 'oc oc-sel-miss';
+  if (!selected && isActual) return 'oc oc-actual';
+  return 'oc oc-none';
+}
+function ocText(selected, isActual, short) {
+  if (selected && isActual)  return `✓ ${short}`;
+  if (selected && !isActual) return `✗ ${short}`;
+  if (!selected && isActual) return short;   // missed
+  return '';
+}
+
+function renderPredRound(r) {
+  const netCls = r.net >= 0 ? 'green' : 'red';
+  const netTxt = `${r.net>=0?'+$':'-$'}${Math.abs(r.net).toFixed(2)}`;
+  const rankBadge = r.best_rank
+    ? `<span class="badge badge-best">rang${r.best_rank} ★</span>` : '';
+  const prizesStr = Object.entries(r.prizes||{})
+    .sort((a,b)=>Number(b[0])-Number(a[0]))
+    .map(([k,v])=>`rang${r.n_matches-Number(k)+1}: $${v}`)
+    .join('  ·  ');
+
+  let matchRows = '';
+  for (const m of r.matches) {
+    const cells = [0, 1, 2].map(o => {
+      const sel = m.sel[o], act = (m.actual === o);
+      return `<td><span class="${ocClass(sel,act)}">${ocText(sel,act,OUTCOME_SHORT[o])}</span></td>`;
+    }).join('');
+    const label = m.home !== '?' ? `${m.home} v ${m.away}` : `Match ${m.idx}`;
+    const scoreLabel = m.score ? `<span style="color:var(--muted);font-size:10px;margin-left:4px;">[${esc(m.score)}]</span>` : '';
+    matchRows += `<tr>
+      <td class="left" style="white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;"
+          title="${esc(label)}">${esc(label.length>28?label.slice(0,28)+'…':label)}${scoreLabel}</td>
+      ${cells}
+      <td style="color:var(--muted);font-size:11px;">${m.cote1}/${m.coteN}/${m.cote2}</td>
+      <td style="color:var(--muted);font-size:11px;">${m.rep1}/${m.repN}/${m.rep2}%</td>
+    </tr>`;
+  }
+
+  return `<div class="pred-round">
+  <div class="pred-round-header" onclick="this.parentElement.querySelector('.pred-round-body').style.display=
+    this.parentElement.querySelector('.pred-round-body').style.display==='none'?'block':'none'">
+    <span style="color:var(--muted);font-size:11px;">Grid #${r.grid_index}</span>
+    <span style="font-weight:600;">${r.date}</span>
+    <span style="color:var(--muted);font-size:11.5px;">${r.formula} grids</span>
+    <span class="${netCls};font-weight:600;">${netTxt}</span>
+    ${rankBadge}
+    ${prizesStr ? `<span style="color:var(--muted);font-size:10.5px;">${esc(prizesStr)}</span>` : ''}
+    <span style="margin-left:auto;color:var(--muted);font-size:11px;">▾</span>
+  </div>
+  <div class="pred-round-body">
+    <table class="pred-match-table">
+      <thead><tr>
+        <th class="left">Match</th>
+        <th>1 (home)</th><th>N (draw)</th><th>2 (away)</th>
+        <th>Odds 1/N/2</th><th>Crowd 1/N/2</th>
+      </tr></thead>
+      <tbody>${matchRows}</tbody>
+    </table>
+    <div style="padding:6px 12px;font-size:11px;color:var(--muted);">
+      Color key:
+      <span class="oc oc-sel-hit" style="margin:0 4px;">✓ selected + correct</span>
+      <span class="oc oc-sel-miss" style="margin:0 4px;">✗ selected + wrong</span>
+      <span class="oc oc-actual" style="margin:0 4px;">not selected but correct (missed)</span>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderPredictions(data) {
+  const errEl = document.getElementById('predError');
+  if (data.error) {
+    errEl.textContent = data.error;
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  // Update tab labels with counts
+  document.getElementById('tabVal').textContent  = `Val set (${(data.val||[]).length} rounds)`;
+  document.getElementById('tabTest').textContent = `Test set (${(data.test||[]).length} rounds)`;
+
+  document.getElementById('predVal').innerHTML  =
+    (data.val||[]).map(renderPredRound).join('') || '<div style="color:var(--muted);font-size:12px;padding:8px;">No val rounds.</div>';
+  document.getElementById('predTest').innerHTML =
+    (data.test||[]).map(renderPredRound).join('') || '<div style="color:var(--muted);font-size:12px;padding:8px;">No test rounds.</div>';
+}
+
+function showPredTab(tab) {
+  document.getElementById('predVal').style.display  = tab==='val'  ? 'flex' : 'none';
+  document.getElementById('predTest').style.display = tab==='test' ? 'flex' : 'none';
+  document.getElementById('tabVal').classList.toggle('active',  tab==='val');
+  document.getElementById('tabTest').classList.toggle('active', tab==='test');
+}
+let _predModelMtime = null;
+async function loadPredictions() {
+  try {
+    const r = await fetch('/api/predictions');
+    if (!r.ok) return;
+    const d = await r.json();
+    renderPredictions(d);
+  } catch(e) { /* silent */ }
+}
+loadPredictions();  // initial load
+
 // ── Polling ──────────────────────────────────────────────────────────────────
+let _lastBestCommit = null;
 async function fetchAndRender() {
   try {
     const r = await fetch('/api/data');
-    if (r.ok) render(await r.json());
-    else document.getElementById('serverTime').textContent = 'Error fetching data';
+    if (!r.ok) { document.getElementById('serverTime').textContent = 'Error'; return; }
+    const d = await r.json();
+    render(d);
+    // Reload predictions when best model changes
+    const bestCommit = d.improvement_series.length
+      ? d.improvement_series[d.improvement_series.length-1].commit : null;
+    if (bestCommit !== _lastBestCommit) {
+      _lastBestCommit = bestCommit;
+      loadPredictions();
+    }
   } catch(e) {
     document.getElementById('serverTime').textContent = 'Connection error — retrying…';
   }
@@ -719,6 +1031,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/data":
             try:
                 self._json(200, build_api_data())
+            except Exception as e:
+                self._json(500, {"error": str(e)})
+        elif self.path == "/api/predictions":
+            try:
+                self._json(200, build_predictions())
             except Exception as e:
                 self._json(500, {"error": str(e)})
         else:
