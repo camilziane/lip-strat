@@ -275,8 +275,10 @@ class REINFORCEAgent:
 
     @classmethod
     def load(cls, path: str) -> "REINFORCEAgent":
-        """Load agent from a .npz file."""
+        """Load a linear or MLP agent from a .npz file (dispatches to subclass)."""
         data = np.load(path)
+        if "W1" in data:
+            return MLPREINFORCEAgent.load(path)
         k_max = int(data["k_max"]) if "k_max" in data else 20
         agent = cls(
             n_matches=int(data["n_matches"]),
@@ -286,6 +288,152 @@ class REINFORCEAgent:
         )
         agent.W = data["W"]
         agent.b = data["b"]
+        return agent
+
+
+class MLPREINFORCEAgent(REINFORCEAgent):
+    """
+    One-hidden-layer MLP policy: obs → ReLU(W1@obs+b1) → W2@h+b2 → logits.
+    Inherits act(), update(), save(), load() interface from REINFORCEAgent.
+    """
+
+    def __init__(
+        self,
+        n_matches: int,
+        hidden_dim: int = 64,
+        k_max: int = 20,
+        lr: float = 0.005,
+        entropy_coef: float = 0.05,
+        seed: int = 42,
+    ):
+        # Initialise base class but override W/b with MLP weights
+        super().__init__(n_matches=n_matches, k_max=k_max,
+                         lr=lr, entropy_coef=entropy_coef, seed=seed)
+        self.hidden_dim = hidden_dim
+        rng = np.random.default_rng(seed)
+        scale1 = np.sqrt(2.0 / self.obs_dim)
+        scale2 = np.sqrt(2.0 / hidden_dim)
+        self.W1 = (rng.standard_normal((hidden_dim, self.obs_dim)) * scale1).astype(np.float32)
+        self.b1 = np.zeros(hidden_dim, dtype=np.float32)
+        self.W2 = (rng.standard_normal((self.action_dim, hidden_dim)) * scale2).astype(np.float32)
+        self.b2 = np.zeros(self.action_dim, dtype=np.float32)
+        # Remove linear weights from base (not used)
+        del self.W, self.b
+
+    def _forward(self, obs: np.ndarray):
+        """Forward pass; returns (logits, hidden_pre, hidden)."""
+        h_pre = self.W1 @ obs.astype(np.float64) + self.b1
+        h = np.maximum(0.0, h_pre)               # ReLU
+        logits = self.W2 @ h + self.b2
+        return logits, h_pre, h
+
+    def act(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
+        logits, _, _ = self._forward(obs)
+        probs = _sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)
+
+        if deterministic:
+            mask = (probs > 0.5).astype(np.float32)
+        else:
+            rand = self._rng.random((self.n_matches, N_OUTCOMES))
+            mask = (rand < probs).astype(np.float32)
+
+        for m in range(self.n_matches):
+            if not mask[m].any():
+                mask[m, int(probs[m].argmax())] = 1.0
+
+        import math
+        while math.prod(int(mask[m].sum()) for m in range(self.n_matches)) > self.k_max:
+            best_m, best_o, best_val = -1, -1, np.inf
+            for m in range(self.n_matches):
+                sel = [o for o in range(N_OUTCOMES) if mask[m, o] > 0.5]
+                if len(sel) <= 1:
+                    continue
+                for o in sel:
+                    if probs[m, o] < best_val:
+                        best_val, best_m, best_o = probs[m, o], m, o
+            if best_m == -1:
+                break
+            mask[best_m, best_o] = 0.0
+
+        return mask.flatten().astype(np.float32)
+
+    def update(
+        self,
+        obs: np.ndarray,
+        action: np.ndarray,
+        per_combo_rewards: np.ndarray,
+        selections: np.ndarray,
+    ) -> None:
+        baseline = float(per_combo_rewards.mean())
+        mean_advantage = float(per_combo_rewards.mean() - baseline)  # = 0; use raw mean
+        mean_advantage = float(per_combo_rewards.mean())             # use mean reward as signal
+
+        logits, h_pre, h = self._forward(obs)
+        probs = _sigmoid(logits).reshape(self.n_matches, N_OUTCOMES)
+
+        # Gradient of Bernoulli log-prob w.r.t. logits: (b - sigma) * advantage
+        grad_logits = np.zeros(self.action_dim, dtype=np.float64)
+        advantages = per_combo_rewards - baseline
+        adv = float(advantages.mean())
+
+        for m in range(self.n_matches):
+            for o in range(N_OUTCOMES):
+                b_mo = float(selections[m, o])
+                sigma = probs[m, o]
+                grad_logits[m * N_OUTCOMES + o] = (b_mo - sigma) * adv
+
+        # Entropy bonus
+        if self.entropy_coef > 0:
+            for m in range(self.n_matches):
+                for o in range(N_OUTCOMES):
+                    p = np.clip(probs[m, o], 1e-7, 1 - 1e-7)
+                    grad_logits[m * N_OUTCOMES + o] += (
+                        self.entropy_coef * (np.log(1 - p) - np.log(p)) * p * (1 - p)
+                    )
+
+        # Backprop through W2
+        grad_W2 = np.outer(grad_logits, h)
+        grad_b2 = grad_logits.copy()
+        grad_h = self.W2.T @ grad_logits
+
+        # Backprop through ReLU + W1
+        grad_h_pre = grad_h * (h_pre > 0)
+        obs64 = obs.astype(np.float64)
+        grad_W1 = np.outer(grad_h_pre, obs64)
+        grad_b1 = grad_h_pre.copy()
+
+        n = max(len(per_combo_rewards), 1)
+        self.W2 += (self.lr * grad_W2 / n).astype(np.float32)
+        self.b2 += (self.lr * grad_b2 / n).astype(np.float32)
+        self.W1 += (self.lr * grad_W1 / n).astype(np.float32)
+        self.b1 += (self.lr * grad_b1 / n).astype(np.float32)
+
+    def save(self, path: str) -> None:
+        np.savez(
+            path,
+            W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
+            n_matches=np.int32(self.n_matches),
+            hidden_dim=np.int32(self.hidden_dim),
+            k_max=np.int32(self.k_max),
+            lr=np.float32(self.lr),
+            entropy_coef=np.float32(self.entropy_coef),
+        )
+        print(f"MLP agent saved → {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "MLPREINFORCEAgent":
+        data = np.load(path)
+        agent = cls(
+            n_matches=int(data["n_matches"]),
+            hidden_dim=int(data["hidden_dim"]),
+            k_max=int(data["k_max"]) if "k_max" in data else 20,
+            lr=float(data["lr"]),
+            entropy_coef=float(data["entropy_coef"]),
+        )
+        agent.W1 = data["W1"]
+        agent.b1 = data["b1"]
+        agent.W2 = data["W2"]
+        agent.b2 = data["b2"]
         return agent
 
 

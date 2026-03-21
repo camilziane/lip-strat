@@ -106,5 +106,7 @@ Auto-updated by `improve.py` on every new best. Sorted by `score = test_net_per_
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Test Net/Round | Hit Rate | Train Net/Round | Commit |
 |------|-------|----------|----------|---------------|----------|-----------------|--------|
-| 1 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-15.00 | 0.0% | $-14.50 | — |
+| 1 | 2 | `lr_high` | linear, lr=0.02 | $+122.50 | 25.0% | $-12.35 | e4a8913 |
+| 2 | 3 | `lr_low` | linear, lr=0.001 | $-13.50 | 0.0% | $-12.75 | — |
+| 3 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-15.00 | 0.0% | $-14.50 | — |
 <!-- LEADERBOARD_END -->

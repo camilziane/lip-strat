@@ -18,5 +18,39 @@
     "model_path": "agent_best.npz",
     "timestamp": "2026-03-21 15:51",
     "commit_hash": ""
+  },
+  {
+    "trial": 2,
+    "strategy_name": "lr_high",
+    "keywords": [
+      "linear",
+      "lr=0.02"
+    ],
+    "test_net_per_round": 122.5,
+    "test_round_hit_rate": 0.25,
+    "train_net_per_round": -12.35,
+    "n_test_rounds": 4,
+    "n_train_rounds": 8,
+    "score": 135.0,
+    "model_path": "agent_best.npz",
+    "timestamp": "2026-03-21 15:51",
+    "commit_hash": "e4a8913"
+  },
+  {
+    "trial": 3,
+    "strategy_name": "lr_low",
+    "keywords": [
+      "linear",
+      "lr=0.001"
+    ],
+    "test_net_per_round": -13.5,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -12.75,
+    "n_test_rounds": 4,
+    "n_train_rounds": 8,
+    "score": -13.5,
+    "model_path": "agent_best.npz",
+    "timestamp": "2026-03-21 15:51",
+    "commit_hash": ""
   }
 ]
