@@ -15,9 +15,12 @@ Maximise test profit for a Loto Foot betting agent. The loop is simple:
 uv sync                                     # install dependencies
 
 # Continuous improvement (the main command)
-uv run python improve.py                    # run forever
-uv run python improve.py --max-trials 30   # stop after N trials
-uv run python improve.py --test-grids 4   # hold out last 4 rounds
+uv run python improve.py                             # run forever
+uv run python improve.py --max-trials 30             # stop after N trials
+uv run python improve.py --val-ratio 0.2 --test-ratio 0.2  # custom split
+
+# Live monitoring dashboard (open http://localhost:8765)
+uv run python dashboard.py
 
 # Single training run
 uv run python train.py --save agent.npz
@@ -104,9 +107,26 @@ When `improve.py` has exhausted `PREDEFINED`, consider adding to `PREDEFINED` in
 Auto-updated by `improve.py` on every new best. Sorted by `score = test_net_per_round + 50 × test_round_hit_rate`.
 
 <!-- LEADERBOARD_START -->
-| Rank | Trial | Strategy | Keywords | Test Net/Round | Hit Rate | Train Net/Round | Commit |
-|------|-------|----------|----------|---------------|----------|-----------------|--------|
-| 1 | 2 | `lr_high` | linear, lr=0.02 | $+122.50 | 25.0% | $-12.35 | e4a8913 |
-| 2 | 3 | `lr_low` | linear, lr=0.001 | $-13.50 | 0.0% | $-12.75 | — |
-| 3 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-15.00 | 0.0% | $-14.50 | — |
+| Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
+|------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
+| 1 | 2 | `lr_high` | linear, lr=0.02 | $+122.50 | 25.0% | $+122.50 | 25.0% | e4a8913 |
+| 2 | 33 | `random_32` | linear, lr=0.0283, entropy=0.056, k=20, ep=6k | $-5.00 | 0.0% | $-12.00 | 0.0% | — |
+| 3 | 34 | `random_33` | linear, lr=0.0210, entropy=0.245, k=32, ep=4k | $-5.00 | 0.0% | $-24.00 | 0.0% | — |
+| 4 | 28 | `random_27` | linear, lr=0.0117, entropy=0.024, k=8, ep=10k | $-6.00 | 0.0% | $-8.00 | 0.0% | — |
+| 5 | 38 | `random_37` | mlp, h=128, lr=0.0022, entropy=0.002, k=8, ep=6k | $-6.00 | 0.0% | $-8.00 | 0.0% | — |
+| 6 | 12 | `entropy_high` | linear, entropy=0.2 | $-7.00 | 0.0% | $-7.00 | 0.0% | — |
+| 7 | 14 | `k8` | linear, k=8 | $-7.00 | 0.0% | $+12.40 | 50.0% | — |
+| 8 | 15 | `k32` | linear, k=32 | $-8.00 | 0.0% | $-9.50 | 0.0% | — |
+| 9 | 18 | `ep_20k` | linear, ep=20k | $-8.00 | 0.0% | $-18.00 | 0.0% | — |
+| 10 | 22 | `mlp_64_hlr` | mlp, h=64, lr=0.02 | $-8.00 | 0.0% | $+42.85 | 50.0% | — |
+| 11 | 25 | `mlp_32_k8` | mlp, h=32, k=8 | $-8.00 | 0.0% | $-8.00 | 0.0% | — |
+| 12 | 29 | `random_28` | mlp, h=128, lr=0.0484, entropy=0.039, k=8, ep=10k | $-8.00 | 0.0% | $-7.00 | 0.0% | — |
+| 13 | 35 | `random_34` | linear, lr=0.0032, entropy=0.371, k=32, ep=4k | $-8.00 | 0.0% | $-4.00 | 0.0% | — |
+| 14 | 37 | `random_36` | linear, lr=0.0047, entropy=0.002, k=8, ep=10k | $-8.00 | 0.0% | $-7.00 | 0.0% | — |
+| 15 | 36 | `random_35` | mlp, h=64, lr=0.0023, entropy=0.204, k=16, ep=16k | $-9.00 | 0.0% | $-16.00 | 0.0% | — |
+| 16 | 5 | `lr_high` | linear, lr=0.02 | $-10.00 | 0.0% | $-12.00 | 0.0% | — |
+| 17 | 11 | `entropy_low` | linear, entropy=0.01 | $-10.00 | 0.0% | $-14.00 | 0.0% | — |
+| 18 | 39 | `random_38` | linear, lr=0.0942, entropy=0.001, k=20, ep=6k | $-10.00 | 0.0% | $-12.00 | 0.0% | — |
+| 19 | 7 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-10.50 | 0.0% | $-14.00 | 0.0% | — |
+| 20 | 4 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-11.00 | 0.0% | $-6.00 | 0.0% | — |
 <!-- LEADERBOARD_END -->
