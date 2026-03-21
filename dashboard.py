@@ -15,6 +15,7 @@ import os
 import signal
 import subprocess
 import threading
+import time
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -27,7 +28,8 @@ DATASETS_DIR     = "datasets"
 
 # ── Training process state ────────────────────────────────────────────────────
 _proc: subprocess.Popen | None = None
-_proc_lock = threading.Lock()
+_proc_lock      = threading.Lock()
+_proc_start_time: float | None = None   # wall-clock time when current process started
 
 
 def _is_running() -> bool:
@@ -42,7 +44,7 @@ def _start_training(
     test_ratio: float = 0.2,
     max_trials: int = 0,
 ) -> dict:
-    global _proc
+    global _proc, _proc_start_time
     with _proc_lock:
         if _proc is not None and _proc.poll() is None:
             return {"ok": False, "error": "Already running"}
@@ -57,6 +59,7 @@ def _start_training(
             cmd += ["--max-trials", str(max_trials)]
         try:
             _proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _proc_start_time = time.time()
             return {"ok": True, "pid": _proc.pid, "active_dir": dataset_dir or "."}
         except Exception as e:
             return {"ok": False, "error": str(e)}
@@ -323,16 +326,11 @@ def build_api_data(dataset_dir: str = "") -> dict:
     best_entry = max(board, key=lambda e: e.get("score", -999), default=None)
     current_best_score = best_entry["score"] if best_entry else None
 
-    training_elapsed_s = None
     log_lines = _log_tail(dataset_dir)
-    for line in log_lines:
-        if line.startswith("[") and len(line) > 20:
-            try:
-                ts = datetime.strptime(line[1:20], "%Y-%m-%d %H:%M:%S")
-                training_elapsed_s = int((datetime.now() - ts).total_seconds())
-                break
-            except Exception:
-                pass
+    if _is_running() and _proc_start_time is not None:
+        training_elapsed_s = int(time.time() - _proc_start_time)
+    else:
+        training_elapsed_s = None
 
     # pull split sizes from the best leaderboard entry (written by improve.py)
     n_train = best_entry.get("n_train_rounds", 0) if best_entry else 0
