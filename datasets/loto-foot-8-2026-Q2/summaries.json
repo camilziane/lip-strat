@@ -179,5 +179,40 @@
     "predefined_not_yet_tried": [],
     "total_trials_so_far": 34,
     "commit": "5061674"
+  },
+  {
+    "improvement_number": 5,
+    "trial": 41,
+    "strategy": "random_40",
+    "keywords": [
+      "mlp",
+      "h=64",
+      "lr=0.0167",
+      "entropy=0.032",
+      "k=20",
+      "ep=16k"
+    ],
+    "policy": "mlp",
+    "score": 55.0,
+    "score_delta": 60.0,
+    "val_net": 30.0,
+    "val_hit_pct": 50.0,
+    "test_net": -9.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-21 22:18",
+    "key_change": "Added: [entropy=0.032, ep=16k, h=64, k=20, lr=0.0167, mlp]  Removed: [entropy=0.003, ep=4k, k=50, linear, lr=0.0010]",
+    "what_worked": [
+      "Non-linear MLP policy (h=64) beat the linear baseline",
+      "More episodes (16k) gave better convergence"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try larger MLP h=128 \u2014 with only 10 features/match, more capacity may help",
+      "Try a 2-hidden-layer MLP: add second layer after ReLU (needs architecture change in train.py)",
+      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
+    ],
+    "predefined_not_yet_tried": [],
+    "total_trials_so_far": 41,
+    "commit": "9388e17"
   }
 ]
