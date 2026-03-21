@@ -21,8 +21,12 @@
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 4 | `lr_low` | linear, lr=0.001 | $-11.00 | 0.0% | $-6.00 | 0.0% | cb9baf2 |
-| 2 | 2 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-12.00 | 0.0% | $-12.00 | 0.0% | 61a9605 |
-| 3 | 3 | `lr_high` | linear, lr=0.02 | $-14.00 | 0.0% | $-14.00 | 0.0% | — |
-| 4 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-16.00 | 0.0% | $-16.00 | 0.0% | 8140806 |
+| 1 | 5 | `lr_very_high` | linear, lr=0.05 | $-10.00 | 0.0% | $-12.00 | 0.0% | 7732256 |
+| 2 | 7 | `entropy_high` | linear, entropy=0.2 | $-10.50 | 0.0% | $-14.00 | 0.0% | — |
+| 3 | 4 | `lr_low` | linear, lr=0.001 | $-11.00 | 0.0% | $-6.00 | 0.0% | cb9baf2 |
+| 4 | 2 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-12.00 | 0.0% | $-12.00 | 0.0% | 61a9605 |
+| 5 | 3 | `lr_high` | linear, lr=0.02 | $-14.00 | 0.0% | $-14.00 | 0.0% | — |
+| 6 | 8 | `entropy_zero` | linear, entropy=0 | $-15.00 | 0.0% | $-17.00 | 0.0% | — |
+| 7 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-16.00 | 0.0% | $-16.00 | 0.0% | 8140806 |
+| 8 | 6 | `entropy_low` | linear, entropy=0.01 | $-16.00 | 0.0% | $-16.00 | 0.0% | — |
 <!-- LEADERBOARD_END -->
