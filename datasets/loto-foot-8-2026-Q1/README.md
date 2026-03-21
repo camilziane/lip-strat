@@ -19,4 +19,7 @@
 <!-- Auto-populated by improve.py on each new best. Do not edit between the markers. -->
 
 <!-- LEADERBOARD_START -->
+| Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
+|------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
+| 1 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-16.00 | 0.0% | $-16.00 | 0.0% | 8140806 |
 <!-- LEADERBOARD_END -->
