@@ -37,5 +37,41 @@
     ],
     "total_trials_so_far": 1,
     "commit": "1676d20"
+  },
+  {
+    "improvement_number": 1,
+    "trial": 2,
+    "strategy": "lr_high",
+    "keywords": [
+      "linear",
+      "lr=0.02"
+    ],
+    "policy": "linear",
+    "score": -12.0,
+    "score_delta": 4.0,
+    "val_net": -12.0,
+    "val_hit_pct": 0.0,
+    "test_net": -9.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-21 22:16",
+    "key_change": "Added: [lr=0.02]  Removed: [entropy=0.05, ep=6k, k=20, lr=0.005]",
+    "what_worked": [
+      "Higher learning rate (0.02) helped \u2014 faster adaptation to prize structure"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try MLP policy (h=64 or h=128) with same lr=0.0200 \u2014 non-linear features may extract more signal from odds + crowd %",
+      "Try ep=12k or ep=20k with current winning config [linear, lr=0.02] \u2014 more training may refine the policy",
+      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
+    ],
+    "predefined_not_yet_tried": [
+      "lr_low",
+      "lr_very_high",
+      "entropy_low",
+      "entropy_high",
+      "entropy_zero"
+    ],
+    "total_trials_so_far": 2,
+    "commit": "d5547f2"
   }
 ]
