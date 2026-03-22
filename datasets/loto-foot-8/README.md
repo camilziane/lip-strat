@@ -45,6 +45,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
+| 1 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | aacc3e8 |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -54,6 +55,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- HISTORY_START -->
 | # | Trial | Strategy | Score | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |---|-------|----------|-------|--------------|----------|----------------|-----------|--------|
+| 1 | 1 | `baseline` | -17.9 | $-17.76 | 0% | $-18.00 | 0% | aacc3e8 |
 <!-- HISTORY_END -->
 
 ---
