@@ -34,6 +34,9 @@ ENV/
 improve.log
 *.log
 
+# ── Auto-generated outputs ────────────────────────────────────────────────────
+improvement.png
+
 # ── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
