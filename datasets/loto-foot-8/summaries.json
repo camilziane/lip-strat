@@ -1,0 +1,77 @@
+[
+  {
+    "improvement_number": 0,
+    "trial": 1,
+    "strategy": "baseline",
+    "keywords": [
+      "linear",
+      "lr=0.005",
+      "entropy=0.05",
+      "k=20",
+      "ep=6k"
+    ],
+    "policy": "linear",
+    "score": -17.8824,
+    "score_delta": -17.8824,
+    "val_net": -17.88,
+    "val_hit_pct": 0.0,
+    "test_net": -17.76,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 11:49",
+    "key_change": "First improvement found",
+    "what_worked": [
+      "Strategy [baseline] found a better combination of features"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try MLP policy (h=64 or h=128) with same lr=0.0050 \u2014 non-linear features may extract more signal from odds + crowd %",
+      "Try ep=12k or ep=20k with current winning config [linear, lr=0.005, entropy=0.05, k=20, ep=6k] \u2014 more training may refine the policy",
+      "Try lr=0.02 \u2014 higher LR sometimes escapes flat regions faster",
+      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round"
+    ],
+    "predefined_not_yet_tried": [
+      "lr_high",
+      "lr_low",
+      "lr_very_high",
+      "entropy_low",
+      "entropy_high"
+    ],
+    "total_trials_so_far": 1,
+    "commit": "b4475c0"
+  },
+  {
+    "improvement_number": 1,
+    "trial": 13,
+    "strategy": "mlp_32",
+    "keywords": [
+      "mlp",
+      "h=32"
+    ],
+    "policy": "mlp",
+    "score": 19.9059,
+    "score_delta": 1.5118,
+    "val_net": 14.02,
+    "val_hit_pct": 11.8,
+    "test_net": -14.47,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 11:52",
+    "key_change": "Added: [h=32, mlp]  Removed: [linear, lr=0.02]",
+    "what_worked": [
+      "Non-linear MLP policy (h=32) beat the linear baseline"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try larger MLP h=64 \u2014 with only 10 features/match, more capacity may help",
+      "Try a 2-hidden-layer MLP: add second layer after ReLU (needs architecture change in train.py)",
+      "Try ep=12k or ep=20k with current winning config [mlp, h=32] \u2014 more training may refine the policy",
+      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round"
+    ],
+    "predefined_not_yet_tried": [
+      "mlp_64",
+      "mlp_128",
+      "mlp_64_hlr",
+      "mlp_64_ep12k",
+      "mlp_128_hlr"
+    ],
+    "total_trials_so_far": 13,
+    "commit": ""
+  }
+]
