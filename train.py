@@ -43,14 +43,22 @@ def parse_cutoff_date(path: str) -> str | None:
     """
     Extract the training cutoff date from the filename.
 
-    The convention is: the last occurrence of 'au_YYYY-MM-DD' in the filename
-    gives the maximum allowed grid date for training.
+    Prefers the pattern 'grilles-DATE_au_CUTOFF' which unambiguously names
+    the end of the grilles period.  Falls back to the last 'au_YYYY-MM-DD'
+    occurrence for older filename conventions.
 
-    Example:
-        loto-foot-8_..._rang-2026-02-19_au_2026-03-21_train.xlsx
-        → cutoff = '2026-03-21'
+    Examples:
+        grilles-2025-09-04_au_2026-03-20_..._rang-..._au_2025-09-04.xlsx
+        -> cutoff = '2026-03-20'  (grilles_au pattern wins)
+
+        ..._rang-2026-02-19_au_2026-03-21_train.xlsx
+        -> cutoff = '2026-03-21'  (last au_ fallback)
     """
     basename = os.path.basename(path)
+    # Prefer the date that closes the grilles range
+    m = re.search(r'grilles-\d{4}-\d{2}-\d{2}_au_(\d{4}-\d{2}-\d{2})', basename)
+    if m:
+        return m.group(1)
     matches = re.findall(r'au_(\d{4}-\d{2}-\d{2})', basename)
     return matches[-1] if matches else None
 
@@ -127,7 +135,7 @@ def load_data(
     if cutoff_date is not None:
         before = len(grids)
         grids = [g for g in grids if g["date"] <= cutoff_date]
-        print(f"Cutoff date: {cutoff_date}  ({before} → {len(grids)} rounds kept)")
+        print(f"Cutoff date: {cutoff_date}  ({before} -> {len(grids)} rounds kept)")
 
     return grids
 
@@ -318,7 +326,7 @@ class REINFORCEAgent:
         for k, v in self.policy.state_dict().items():
             data[f"p_{k}"] = v.numpy()
         np.savez(path, **data)
-        print(f"Agent saved → {path}")
+        print(f"Agent saved -> {path}")
 
     @classmethod
     def load(cls, path: str) -> "REINFORCEAgent":

@@ -193,7 +193,7 @@ def _warm_start(agent: REINFORCEAgent, init_model_path: str) -> None:
             agent.policy.load_state_dict(src_sd)
         else:
             log(f"   Warm-start skipped: architecture mismatch "
-                f"(hidden={src.hidden_dim} → {agent.hidden_dim})")
+                f"(hidden={src.hidden_dim} -> {agent.hidden_dim})")
     except Exception as e:
         log(f"   Warm-start failed: {e}")
 
@@ -650,7 +650,7 @@ def main() -> None:
             f"val_net={last['val_net']:+.2f}")
         log(f"   What worked : {'; '.join(last.get('what_worked', []))}")
         for h in last.get("hypotheses_for_next_agent", []):
-            log(f"   → {h}")
+            log(f"   -> {h}")
 
     # ── Strategy iterator ────────────────────────────────────────────────
     rng = np.random.default_rng(args.seed + trial_offset)
