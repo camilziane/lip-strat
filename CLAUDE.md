@@ -16,6 +16,8 @@ uv run python improve.py --dataset-dir datasets/<name> --max-trials 30
 uv run python improve.py --dataset-dir datasets/<name> \
     --init-model datasets/<other>/agent_best.npz                   # warm-start
 uv run python improve.py --dataset-dir datasets/<name> --reset     # clear all state & commit
+uv run python improve.py --dataset-dir datasets/<name> \
+    --extra-features player_consensus                              # add top-50 player picks
 
 uv run python dashboard.py                                         # http://localhost:8765
 uv run python train.py --episodes 10000 --lr 0.02 --entropy-coef 0.1
@@ -32,13 +34,14 @@ Excel → load_data() → list[grid_dict]  (chronological)
          LotoFootEnv               REINFORCEAgent
          (env.py)                  (train.py)
               │                         │
-         observation (n×10)        _PolicyNet (PyTorch)
+         observation (n×11)        _PolicyNet (PyTorch)
               │                    logits → sigmoid → Bernoulli mask
          step(binary_mask)              │
               └── reward = (earnings − n_combos) / n_combos ───┘
 ```
 
-- **Observation** — `n_matches × 10`: `implied_p1, implied_pN, implied_p2, rep1, repN, rep2, margin, log_spread, value1, value2`
+- **Observation** — `n_matches × 11` (base): `implied_p1, implied_pN, implied_p2, rep1, repN, rep2, margin, log_spread, value1, valueN, value2`
+  - With `--extra-features player_consensus`: `n_matches × 14` (+3 per match: fraction of top-50 players picking 1/N/2)
 - **Action** — `n_matches × 3` binary mask; total grids = product of selections per match, capped at `k_max`
 - **Reward** — `(total_earnings − n_combos × $1) / n_combos`
 - **Policy** — linear (`hidden_dim=0`) or MLP (`hidden_dim>0`), REINFORCE + entropy + Adam + EMA baseline
@@ -83,9 +86,12 @@ The README must be kept up to date throughout the session:
 
 1. Baseline: `uv run python improve.py --dataset-dir datasets/<name> --max-trials 5 > datasets/<name>/run.log 2>&1`
 2. Read result: `grep "score=" datasets/<name>/run.log | tail -5`
-3. Form hypothesis → edit code → `git commit` → run → record in `results.tsv`
-4. Score improved → keep; otherwise `git reset --hard HEAD~1`
-5. Never stop or ask for confirmation
+3. **After each new best** — write your own reasoning directly into two places:
+   - `datasets/<name>/README.md` → "What to Try Next" section: replace with your actual analysis of *why* this worked and what to try next, based on the results
+   - `datasets/<name>/summaries.json` → last entry's `"agent_notes"` field: same reasoning in one compact paragraph (shown in the dashboard)
+4. Form hypothesis → edit code → `git commit` → run → record in `results.tsv`
+5. Score improved → keep; otherwise `git reset --hard HEAD~1`
+6. Never stop or ask for confirmation
 
 ### Mindset — you have full creative freedom
 

@@ -935,9 +935,7 @@ function renderSummaries(summaries) {
       ? `<span class="${s.score_delta>=0?'green':'red'}">${s.score_delta>=0?'+':''}${s.score_delta.toFixed(4)}</span>`
       : '';
     const chips = (s.keywords||[]).map(k=>`<span class="summary-chip">${esc(k)}</span>`).join('');
-    const insights = (s.what_worked||[]).map(i=>`<li>${esc(i)}</li>`).join('');
-    const hyps = (s.hypotheses_for_next_agent||[]).map(h=>`<li>${esc(h)}</li>`).join('');
-    const notTried = (s.predefined_not_yet_tried||[]).map(n=>`<span class="summary-chip">${esc(n)}</span>`).join('');
+    const notes = (s.agent_notes||'').trim();
 
     el.innerHTML += `
 <div class="summary-card">
@@ -957,9 +955,10 @@ function renderSummaries(summaries) {
   </div>
   <div style="margin-bottom:8px;">${chips}</div>
   ${s.key_change ? `<div class="summary-section"><h4>Key change</h4><div style="color:var(--orange);font-size:11.5px;">${esc(s.key_change)}</div></div>` : ''}
-  ${insights ? `<div class="summary-section"><h4>What worked</h4><ul>${insights}</ul></div>` : ''}
-  ${hyps ? `<div class="summary-section summary-hyp"><h4>🔬 Next agent should try</h4><ul>${hyps}</ul></div>` : ''}
-  ${notTried ? `<div class="summary-section"><h4>Predefined strategies not yet tried</h4>${notTried}</div>` : ''}
+  ${notes
+    ? `<div class="summary-section summary-hyp"><h4>Agent reasoning</h4><div style="white-space:pre-wrap;font-size:12px;">${esc(notes)}</div></div>`
+    : `<div class="summary-section" style="color:var(--muted);font-size:11px;font-style:italic;">No agent notes yet — autoresearch agent should update summaries.json after this improvement.</div>`
+  }
 </div>`;
   });
 }

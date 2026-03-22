@@ -54,17 +54,21 @@ VALID_N_MATCHES = {7, 8, 12, 15}
 
 def make_obs(grid: dict) -> np.ndarray:
     """
-    Build the (n_matches × 11)-dim observation vector from a grid dict.
+    Build the observation vector from a grid dict.
 
-    grid must contain 'features_raw': flat list of 6 values per match:
-        [cote1, coteN, cote2, rep1, repN, rep2]  (rep values 0–100)
-
-    Features (11 per match):
+    Base features (N_FEATURES = 11 per match), built from 'features_raw':
         implied_p1, implied_pN, implied_p2   – normalised from bookmaker odds
         rep1, repN, rep2                     – crowd % / 100
         margin                               – bookmaker overround (vig)
         log_spread                           – log(max_cote / min_cote)
-        value1, valueN, value2               – crowd vs implied divergence (all 3 outcomes)
+        value1, valueN, value2               – crowd vs implied divergence
+
+    Extra features (optional, appended after the base block):
+        player_consensus  →  3 features per match: fraction of top-50 players
+                             who selected outcome 1 / N / 2.  Stored in grid
+                             dict under 'extra_features_raw' by load_data().
+
+    Total obs shape: (n_matches × (11 + n_extra),) flattened.
     """
     n = grid["n_matches"]
     raw = np.array(grid["features_raw"], dtype=np.float32).reshape(n, 6)
@@ -86,6 +90,12 @@ def make_obs(grid: dict) -> np.ndarray:
 
         obs[m] = [p[0], p[1], p[2], crowd[0], crowd[1], crowd[2],
                   margin, log_spread, value1, valueN, value2]
+
+    extra_raw = grid.get("extra_features_raw")
+    if extra_raw:
+        n_extra = len(extra_raw) // n
+        extra = np.array(extra_raw, dtype=np.float32).reshape(n, n_extra)
+        obs = np.concatenate([obs, extra], axis=1)
 
     return obs.flatten()
 
@@ -131,7 +141,7 @@ class LotoFootEnv(gym.Env):
         self.render_mode = render_mode
 
         self.n_matches: int = grids[0]["n_matches"]
-        self.obs_dim: int = self.n_matches * N_FEATURES
+        self.obs_dim: int = len(make_obs(grids[0]))   # accounts for any extra features
         self.action_dim: int = self.n_matches * N_OUTCOMES
 
         self._eval_idx: int = 0

@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import math
 import os
-import re
 import numpy as np
 import pandas as pd
 import torch
@@ -39,34 +38,47 @@ def _outcome(score: str) -> int:
     return 0 if h > a else (1 if h == a else 2)
 
 
-def parse_cutoff_date(path: str) -> str | None:
+
+def _player_consensus(df: pd.DataFrame, gdf: pd.DataFrame) -> list[float]:
     """
-    Extract the training cutoff date from the filename.
+    For each match in gdf, compute the fraction of top players picking each outcome.
 
-    Prefers the pattern 'grilles-DATE_au_CUTOFF' which unambiguously names
-    the end of the grilles period.  Falls back to the last 'au_YYYY-MM-DD'
-    occurrence for older filename conventions.
+    Returns a flat list of n_matches * 3 values interleaved as:
+        [p1_m0, pN_m0, p2_m0,  p1_m1, pN_m1, p2_m1, ...]
 
-    Examples:
-        grilles-2025-09-04_au_2026-03-20_..._rang-..._au_2025-09-04.xlsx
-        -> cutoff = '2026-03-20'  (grilles_au pattern wins)
-
-        ..._rang-2026-02-19_au_2026-03-21_train.xlsx
-        -> cutoff = '2026-03-21'  (last au_ fallback)
+    Player columns are identified by the presence of a '{player} Résultat' column.
+    Each player's prediction is binary (0/1 per outcome); the fraction is the mean.
     """
-    basename = os.path.basename(path)
-    # Prefer the date that closes the grilles range
-    m = re.search(r'grilles-\d{4}-\d{2}-\d{2}_au_(\d{4}-\d{2}-\d{2})', basename)
-    if m:
-        return m.group(1)
-    matches = re.findall(r'au_(\d{4}-\d{2}-\d{2})', basename)
-    return matches[-1] if matches else None
+    player_ids = [col[: -len(" Résultat")]
+                  for col in df.columns if col.endswith(" Résultat")]
+    if not player_ids:
+        return []
+
+    cols1 = [f"{p} 1" for p in player_ids if f"{p} 1" in gdf.columns]
+    colsN = [f"{p} N" for p in player_ids if f"{p} N" in gdf.columns]
+    cols2 = [f"{p} 2" for p in player_ids if f"{p} 2" in gdf.columns]
+
+    p1 = gdf[cols1].values.mean(axis=1) if cols1 else np.zeros(len(gdf))
+    pN = gdf[colsN].values.mean(axis=1) if colsN else np.zeros(len(gdf))
+    p2 = gdf[cols2].values.mean(axis=1) if cols2 else np.zeros(len(gdf))
+
+    result: list[float] = []
+    for i in range(len(gdf)):
+        result.extend([float(p1[i]), float(pN[i]), float(p2[i])])
+    return result
 
 
 def load_data(
     path: str = EXCEL_FILE,
     loto_type: str | None = None,
+    extra_features: list[str] | None = None,
 ) -> list[dict]:
+    """
+    extra_features : optional list of feature groups to append to each grid.
+        Supported values:
+          "player_consensus" — 3 extra features per match: fraction of top-50
+                               players who selected outcome 1 / N / 2.
+    """
     """
     Load all complete rounds from the Excel file.
 
@@ -112,16 +124,20 @@ def load_data(
             if val > 0:
                 prizes[n_matches - i] = val
 
-        grids.append({
-            "grid_index":  gid,
-            "date":        gdf["date"].iloc[0],
-            "loto_type":   ltype,
-            "n_matches":   n_matches,
+        grid: dict = {
+            "grid_index":   gid,
+            "date":         gdf["date"].iloc[0],
+            "loto_type":    ltype,
+            "n_matches":    n_matches,
             "features_raw": features_raw,
-            "outcomes":    np.array(outcomes, dtype=np.int32),
-            "prizes":      prizes,
-            "match_info":  match_info,
-        })
+            "outcomes":     np.array(outcomes, dtype=np.int32),
+            "prizes":       prizes,
+            "match_info":   match_info,
+        }
+        if extra_features:
+            if "player_consensus" in extra_features:
+                grid["extra_features_raw"] = _player_consensus(df, gdf)
+        grids.append(grid)
 
     grids.sort(key=lambda x: x["date"])
 
@@ -132,7 +148,7 @@ def split_data(
     grids: list[dict],
     val_ratio: float = 0.2,
     test_ratio: float = 0.2,
-    seed: int = 42,
+    seed: int = 42,  # unused — split is always chronological, not random
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Chronological split: oldest rounds → train, most recent → val → test.
@@ -141,10 +157,6 @@ def split_data(
     Chronological split correctly simulates deployment: the agent is always
     evaluated on rounds it could not have seen during training, matching how
     a real bettor would use the model.
-
-    Random splitting (the previous behaviour) allowed future rounds to inform
-    training, making val/test scores misleading measures of out-of-sample
-    performance.
     """
     n = len(grids)
     n_test  = max(1, round(n * test_ratio))
@@ -202,10 +214,11 @@ class REINFORCEAgent:
         entropy_coef: float = 0.05,
         seed: int = 42,
         hidden_dim: int = 0,
+        obs_dim: int | None = None,   # override when extra features are used
     ):
         self.n_matches    = n_matches
         self.k_max        = k_max
-        self.obs_dim      = n_matches * N_FEATURES
+        self.obs_dim      = obs_dim if obs_dim is not None else n_matches * N_FEATURES
         self.action_dim   = n_matches * N_OUTCOMES
         self.lr           = lr
         self.entropy_coef = entropy_coef
@@ -378,10 +391,12 @@ class MLPREINFORCEAgent(REINFORCEAgent):
         lr: float = 0.005,
         entropy_coef: float = 0.05,
         seed: int = 42,
+        obs_dim: int | None = None,
     ):
         super().__init__(
             n_matches=n_matches, k_max=k_max, lr=lr,
             entropy_coef=entropy_coef, seed=seed, hidden_dim=hidden_dim,
+            obs_dim=obs_dim,
         )
 
 
@@ -503,13 +518,17 @@ def main() -> None:
                         help="Filter by grid type, e.g. loto-foot-8 (default: auto-detect)")
     parser.add_argument("--save", type=str, default=None, metavar="PATH",
                         help="Save trained agent to this .npz file after training")
-    parser.add_argument("--seed",         type=int, default=42)
+    parser.add_argument("--seed",          type=int, default=42)
+    parser.add_argument("--extra-features", type=str, default="",
+                        help="Comma-separated extra feature groups to load. "
+                             "Supported: player_consensus")
     args = parser.parse_args()
 
     k = min(max(args.k_grids, 1), 50)
+    extra_features = [f.strip() for f in args.extra_features.split(",") if f.strip()]
 
     # ---- Data ---------------------------------------------------------------
-    all_grids = load_data(loto_type=args.loto_type)
+    all_grids = load_data(loto_type=args.loto_type, extra_features=extra_features or None)
     if not all_grids:
         raise ValueError(f"No complete grids found (loto_type={args.loto_type!r})")
 
@@ -531,7 +550,8 @@ def main() -> None:
 
     # ---- Agent --------------------------------------------------------------
     agent = REINFORCEAgent(n_matches=n_matches, k_max=k, lr=args.lr,
-                           entropy_coef=args.entropy_coef, seed=args.seed)
+                           entropy_coef=args.entropy_coef, seed=args.seed,
+                           obs_dim=train_env.obs_dim)
 
     # ---- Training loop ------------------------------------------------------
     reward_window: list[float] = []
