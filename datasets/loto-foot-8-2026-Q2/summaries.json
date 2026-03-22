@@ -247,5 +247,39 @@
     "predefined_not_yet_tried": [],
     "total_trials_so_far": 135,
     "commit": "0d28ed8"
+  },
+  {
+    "improvement_number": 7,
+    "trial": 216,
+    "strategy": "random_215",
+    "keywords": [
+      "mlp",
+      "h=128",
+      "lr=0.0012",
+      "entropy=0.122",
+      "k=50",
+      "ep=16k"
+    ],
+    "policy": "mlp",
+    "score": 1529.0,
+    "score_delta": 1452.0,
+    "val_net": 1504.0,
+    "val_hit_pct": 50.0,
+    "test_net": 14.8,
+    "test_hit_pct": 50.0,
+    "timestamp": "2026-03-21 22:25",
+    "key_change": "Added: [entropy=0.122, ep=16k, h=128, k=50, lr=0.0012, mlp]  Removed: [entropy=0.002, ep=4k, k=32, linear, lr=0.0013]",
+    "what_worked": [
+      "Non-linear MLP policy (h=128) beat the linear baseline",
+      "More episodes (16k) gave better convergence",
+      "Wider system bet (k=50) covered more combinations"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try a 2-hidden-layer MLP: add second layer after ReLU (needs architecture change in train.py)",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
+    ],
+    "predefined_not_yet_tried": [],
+    "total_trials_so_far": 216,
+    "commit": "1103270"
   }
 ]
