@@ -213,7 +213,7 @@ class REINFORCEAgent:
         self.policy    = _PolicyNet(self.obs_dim, self.action_dim, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self._rng      = np.random.default_rng(seed)
-        self._reward_baseline = 0.0   # EMA baseline across episodes
+        self._reward_baseline = -1.0  # EMA baseline: -1 = break-even per combo (cost only)
 
     # ------------------------------------------------------------------
     # Action

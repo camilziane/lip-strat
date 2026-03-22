@@ -54,6 +54,8 @@ FIGURES_PATH = "improvement.png"
 
 LEADERBOARD_START = "<!-- LEADERBOARD_START -->"
 LEADERBOARD_END = "<!-- LEADERBOARD_END -->"
+HISTORY_START = "<!-- HISTORY_START -->"
+HISTORY_END = "<!-- HISTORY_END -->"
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +147,23 @@ PREDEFINED: list[Strategy] = [
     Strategy("linear_k4",        ["linear", "lr=0.02", "k=4"],   lr=0.02, k_max=4),
     Strategy("mlp_128_k4",       ["mlp", "h=128", "lr=0.02", "k=4"],
              policy="mlp", hidden_dim=128, lr=0.02, k_max=4),
+    # ── mlp_32 neighbourhood: only winner so far — sweep its hyperparams ──
+    Strategy("mlp_32_lr_mid",     ["mlp", "h=32", "lr=0.01"],
+             policy="mlp", hidden_dim=32, lr=0.01),
+    Strategy("mlp_32_lr_high",    ["mlp", "h=32", "lr=0.02"],
+             policy="mlp", hidden_dim=32, lr=0.02),
+    Strategy("mlp_32_low_ent",    ["mlp", "h=32", "entropy=0.01"],
+             policy="mlp", hidden_dim=32, entropy_coef=0.01),
+    Strategy("mlp_32_ep12k",      ["mlp", "h=32", "ep=12k"],
+             policy="mlp", hidden_dim=32, episodes=12000),
+    Strategy("mlp_32_ep16k",      ["mlp", "h=32", "ep=16k"],
+             policy="mlp", hidden_dim=32, episodes=16000),
+    Strategy("mlp_32_k16",        ["mlp", "h=32", "k=16"],
+             policy="mlp", hidden_dim=32, k_max=16),
+    Strategy("mlp_32_lr_mid_k16", ["mlp", "h=32", "lr=0.01", "k=16"],
+             policy="mlp", hidden_dim=32, lr=0.01, k_max=16),
+    Strategy("mlp_32_lr_high_k8", ["mlp", "h=32", "lr=0.02", "k=8"],
+             policy="mlp", hidden_dim=32, lr=0.02, k_max=8),
 ]
 
 
@@ -301,7 +320,7 @@ def update_claude_md(board: list[dict]) -> None:
     """Replace the LEADERBOARD section in CLAUDE.md with the current table."""
     if not os.path.exists(CLAUDE_MD_PATH):
         return
-    with open(CLAUDE_MD_PATH) as f:
+    with open(CLAUDE_MD_PATH, encoding="utf-8") as f:
         content = f.read()
     if LEADERBOARD_START not in content:
         return
@@ -330,7 +349,33 @@ def update_claude_md(board: list[dict]) -> None:
         content,
         flags=re.DOTALL,
     )
-    with open(CLAUDE_MD_PATH, "w") as f:
+
+    # Build improvement history — all committed bests in chronological order
+    if HISTORY_START in new_content:
+        bests = sorted([e for e in board if e.get("commit_hash")], key=lambda e: e["trial"])
+        hist_rows = [
+            "| # | Trial | Strategy | Score | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |",
+            "|---|-------|----------|-------|--------------|----------|----------------|-----------|--------|",
+        ]
+        for i, e in enumerate(bests, 1):
+            val_net = e.get("val_net_per_round", e.get("test_net_per_round", 0))
+            val_hit = e.get("val_round_hit_rate", e.get("test_round_hit_rate", 0))
+            hist_rows.append(
+                f"| {i} | {e['trial']} | `{e['strategy_name']}` | {e['score']:+.1f} "
+                f"| ${val_net:+.2f} | {val_hit*100:.0f}% "
+                f"| ${e['test_net_per_round']:+.2f} | {e['test_round_hit_rate']*100:.0f}% "
+                f"| {e['commit_hash'][:7]} |"
+            )
+        hist_table = "\n".join(hist_rows)
+        new_hist = f"{HISTORY_START}\n{hist_table}\n{HISTORY_END}"
+        new_content = re.sub(
+            re.escape(HISTORY_START) + r".*?" + re.escape(HISTORY_END),
+            new_hist,
+            new_content,
+            flags=re.DOTALL,
+        )
+
+    with open(CLAUDE_MD_PATH, "w", encoding="utf-8") as f:
         f.write(new_content)
 
 
