@@ -45,10 +45,15 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | 5b6512b |
-| 2 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | 28aea6b |
-| 3 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 20656d5 |
-| 4 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 1 | 5 | `entropy_low` | linear, entropy=0.01 | $-12.11 | 5.9% | $-18.00 | 0.0% | 4cb7833 |
+| 2 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | 5b6512b |
+| 3 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | 28aea6b |
+| 4 | 7 | `lr_high` | linear, lr=0.02 | $-18.00 | 0.0% | $-17.65 | 0.0% | — |
+| 5 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 20656d5 |
+| 6 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 7 | 6 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 8 | 8 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 9 | 9 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -61,6 +66,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 | 1 | 1 | `baseline` | -17.9 | $-17.76 | 0% | $-18.00 | 0% | 20656d5 |
 | 2 | 2 | `lr_high` | -17.8 | $-17.65 | 0% | $-18.00 | 0% | 28aea6b |
 | 3 | 4 | `lr_very_high` | -17.6 | $-18.00 | 0% | $-17.29 | 0% | 5b6512b |
+| 4 | 5 | `entropy_low` | -13.6 | $-12.11 | 6% | $-18.00 | 0% | 4cb7833 |
 <!-- HISTORY_END -->
 
 ---
