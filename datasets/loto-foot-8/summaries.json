@@ -101,5 +101,25 @@
     "agent_notes": "",
     "total_trials_so_far": 8,
     "commit": "7278425"
+  },
+  {
+    "improvement_number": 5,
+    "trial": 9,
+    "strategy": "k32",
+    "keywords": [
+      "linear",
+      "k=32"
+    ],
+    "score": 3.8971,
+    "score_delta": 11.1912,
+    "val_net": 5.85,
+    "val_hit_pct": 5.9,
+    "test_net": -1.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 15:29",
+    "key_change": "Added: [k=32]  Removed: [k=8]",
+    "agent_notes": "",
+    "total_trials_so_far": 9,
+    "commit": "d5b5e48"
   }
 ]

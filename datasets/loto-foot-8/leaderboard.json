@@ -161,5 +161,85 @@
     "model_path": "datasets/loto-foot-8/agent_best.npz",
     "timestamp": "2026-03-22 15:29",
     "commit_hash": "7278425"
+  },
+  {
+    "trial": 9,
+    "strategy_name": "k32",
+    "keywords": [
+      "linear",
+      "k=32"
+    ],
+    "val_net_per_round": 5.85,
+    "val_round_hit_rate": 0.0588,
+    "test_net_per_round": -1.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -1.0,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": 3.8971,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:29",
+    "commit_hash": "d5b5e48"
+  },
+  {
+    "trial": 10,
+    "strategy_name": "k50",
+    "keywords": [
+      "linear",
+      "k=50"
+    ],
+    "val_net_per_round": -38.65,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -39.88,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -15.73,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -39.2647,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:29",
+    "commit_hash": ""
+  },
+  {
+    "trial": 11,
+    "strategy_name": "ep_12k",
+    "keywords": [
+      "linear",
+      "ep=12k"
+    ],
+    "val_net_per_round": -16.82,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -16.94,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": 9.03,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -16.8824,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:29",
+    "commit_hash": ""
+  },
+  {
+    "trial": 12,
+    "strategy_name": "ep_20k",
+    "keywords": [
+      "linear",
+      "ep=20k"
+    ],
+    "val_net_per_round": -17.65,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -17.0,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -17.8235,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:29",
+    "commit_hash": ""
   }
 ]

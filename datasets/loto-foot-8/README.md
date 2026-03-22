@@ -45,14 +45,18 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 8 | `k8` | linear, k=8 | $-7.06 | 0.0% | $-7.53 | 0.0% | 7278425 |
-| 2 | 5 | `entropy_low` | linear, entropy=0.01 | $-12.11 | 5.9% | $-18.00 | 0.0% | 62cf919 |
-| 3 | 7 | `entropy_zero` | linear, entropy=0 | $-16.94 | 0.0% | $-17.53 | 0.0% | — |
-| 4 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | bfcc030 |
-| 5 | 6 | `entropy_high` | linear, entropy=0.2 | $-17.29 | 0.0% | $-18.00 | 0.0% | — |
-| 6 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | b0a09ff |
-| 7 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 675174d |
-| 8 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 1 | 9 | `k32` | linear, k=32 | $+5.85 | 5.9% | $-1.00 | 0.0% | d5b5e48 |
+| 2 | 8 | `k8` | linear, k=8 | $-7.06 | 0.0% | $-7.53 | 0.0% | 7278425 |
+| 3 | 5 | `entropy_low` | linear, entropy=0.01 | $-12.11 | 5.9% | $-18.00 | 0.0% | 62cf919 |
+| 4 | 11 | `ep_12k` | linear, ep=12k | $-16.82 | 0.0% | $-16.94 | 0.0% | — |
+| 5 | 7 | `entropy_zero` | linear, entropy=0 | $-16.94 | 0.0% | $-17.53 | 0.0% | — |
+| 6 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | bfcc030 |
+| 7 | 6 | `entropy_high` | linear, entropy=0.2 | $-17.29 | 0.0% | $-18.00 | 0.0% | — |
+| 8 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | b0a09ff |
+| 9 | 12 | `ep_20k` | linear, ep=20k | $-17.65 | 0.0% | $-18.00 | 0.0% | — |
+| 10 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 675174d |
+| 11 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 12 | 10 | `k50` | linear, k=50 | $-38.65 | 0.0% | $-39.88 | 0.0% | — |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -67,6 +71,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 | 3 | 4 | `lr_very_high` | -17.6 | $-18.00 | 0% | $-17.29 | 0% | bfcc030 |
 | 4 | 5 | `entropy_low` | -13.6 | $-12.11 | 6% | $-18.00 | 0% | 62cf919 |
 | 5 | 8 | `k8` | -7.3 | $-7.06 | 0% | $-7.53 | 0% | 7278425 |
+| 6 | 9 | `k32` | +3.9 | $+5.85 | 6% | $-1.00 | 0% | d5b5e48 |
 <!-- HISTORY_END -->
 
 ---
