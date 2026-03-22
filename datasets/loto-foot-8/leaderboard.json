@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "trial": 1,
+    "strategy_name": "baseline",
+    "keywords": [
+      "linear",
+      "lr=0.005",
+      "entropy=0.05",
+      "k=20",
+      "ep=6k"
+    ],
+    "val_net_per_round": -17.76,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -17.88,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -17.8824,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:27",
+    "commit_hash": "675174d"
+  }
+]

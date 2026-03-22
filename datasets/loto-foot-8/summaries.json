@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "improvement_number": 0,
+    "trial": 1,
+    "strategy": "baseline",
+    "keywords": [
+      "linear",
+      "lr=0.005",
+      "entropy=0.05",
+      "k=20",
+      "ep=6k"
+    ],
+    "score": -17.8824,
+    "score_delta": -17.8824,
+    "val_net": -17.76,
+    "val_hit_pct": 0.0,
+    "test_net": -18.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 15:27",
+    "key_change": "First improvement found",
+    "agent_notes": "",
+    "total_trials_so_far": 1,
+    "commit": "675174d"
+  }
+]
