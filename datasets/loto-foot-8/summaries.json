@@ -109,5 +109,41 @@
     ],
     "total_trials_so_far": 4,
     "commit": "928810f"
+  },
+  {
+    "improvement_number": 3,
+    "trial": 5,
+    "strategy": "entropy_low",
+    "keywords": [
+      "linear",
+      "entropy=0.01"
+    ],
+    "policy": "linear",
+    "score": -13.5853,
+    "score_delta": 4.0618,
+    "val_net": -12.11,
+    "val_hit_pct": 5.9,
+    "test_net": -18.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 13:34",
+    "key_change": "Added: [entropy=0.01]  Removed: [lr=0.05]",
+    "what_worked": [
+      "Near-zero entropy \u2014 policy exploits learned patterns aggressively"
+    ],
+    "hypotheses_for_next_agent": [
+      "Try MLP policy (h=64 or h=128) with same lr=0.0050 \u2014 non-linear features may extract more signal from odds + crowd %",
+      "Try ep=12k or ep=20k with current winning config [linear, entropy=0.01] \u2014 more training may refine the policy",
+      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
+    ],
+    "predefined_not_yet_tried": [
+      "entropy_high",
+      "entropy_zero",
+      "k8",
+      "k32",
+      "k50"
+    ],
+    "total_trials_so_far": 5,
+    "commit": "bbdcac2"
   }
 ]

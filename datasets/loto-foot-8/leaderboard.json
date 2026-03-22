@@ -81,5 +81,128 @@
     "model_path": "datasets/loto-foot-8/agent_best.npz",
     "timestamp": "2026-03-22 13:34",
     "commit_hash": "928810f"
+  },
+  {
+    "trial": 5,
+    "strategy_name": "entropy_low",
+    "keywords": [
+      "linear",
+      "entropy=0.01"
+    ],
+    "val_net_per_round": -12.11,
+    "val_round_hit_rate": 0.0588,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -17.12,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -13.5853,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:34",
+    "commit_hash": "bbdcac2"
+  },
+  {
+    "trial": 6,
+    "strategy_name": "baseline",
+    "keywords": [
+      "linear",
+      "lr=0.005",
+      "entropy=0.05",
+      "k=20",
+      "ep=6k"
+    ],
+    "val_net_per_round": -18.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -17.63,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -18.0,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:36",
+    "commit_hash": ""
+  },
+  {
+    "trial": 7,
+    "strategy_name": "lr_high",
+    "keywords": [
+      "linear",
+      "lr=0.02"
+    ],
+    "val_net_per_round": -18.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -17.65,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -18.0,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -17.8235,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:36",
+    "commit_hash": ""
+  },
+  {
+    "trial": 8,
+    "strategy_name": "lr_low",
+    "keywords": [
+      "linear",
+      "lr=0.001"
+    ],
+    "val_net_per_round": -18.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -11.83,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -18.0,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:36",
+    "commit_hash": ""
+  },
+  {
+    "trial": 9,
+    "strategy_name": "lr_very_high",
+    "keywords": [
+      "linear",
+      "lr=0.05"
+    ],
+    "val_net_per_round": -18.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -18.0,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -18.0,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:36",
+    "commit_hash": ""
+  },
+  {
+    "trial": 10,
+    "strategy_name": "entropy_low",
+    "keywords": [
+      "linear",
+      "entropy=0.01"
+    ],
+    "val_net_per_round": -17.65,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -17.41,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -17.63,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -17.5294,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:37",
+    "commit_hash": ""
   }
 ]
