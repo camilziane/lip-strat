@@ -46,21 +46,21 @@ Excel → load_data() → list[grid_dict]  (chronological)
 ## improve.py
 
 - Tries `PREDEFINED` strategies first, then infinite random search
-- Score: `val_net_per_round + 50 × val_round_hit_rate` (higher is better)
+- Score: `avg(val,test)_net_capped_at_100 + 50 × avg(val,test)_hit_rate` (higher is better)
 - On new best: saves `agent_best.npz`, updates `datasets/<name>/README.md`, commits
 - Restartable from `leaderboard.json`; all outputs stay inside the dataset folder
 
 ## Autoresearch
 
-Run on a dedicated branch. Modify only `train.py` and `improve.py` — never `env.py` or `dashboard.py`. Keep `results.tsv` untracked.
+Run on a dedicated branch. Modify only `train.py` and `improve.py` — never `env.py` or `dashboard.py`. `results.tsv` lives in `datasets/<name>/results.tsv` (untracked).
 
 ```bash
-git checkout -b autoresearch/mar22
+git checkout -b autoresearch/YYYY-MMdd
 ```
 
 Loop:
 1. Baseline: `uv run python improve.py --dataset-dir datasets/<name> --max-trials 5 > run.log 2>&1`
 2. Read result: `grep "score=" run.log | tail -3`
-3. Form hypothesis → edit code → `git commit` → run → record in `results.tsv`
+3. Form hypothesis → edit code → `git commit` → run → record in `datasets/<name>/results.tsv`
 4. Score improved → keep; otherwise `git reset --hard HEAD~1`
 5. Never stop or ask for confirmation

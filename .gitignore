@@ -37,6 +37,9 @@ improve.log
 # ── Auto-generated outputs ────────────────────────────────────────────────────
 improvement.png
 
+# ── Autoresearch ──────────────────────────────────────────────────────────────
+datasets/*/results.tsv
+
 # ── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

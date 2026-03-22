@@ -90,160 +90,24 @@ PREDEFINED: list[Strategy] = [
     Strategy("k8",               ["linear", "k=8"],          k_max=8),
     Strategy("k32",              ["linear", "k=32"],         k_max=32),
     Strategy("k50",              ["linear", "k=50"],         k_max=50),
-    # ── More episodes ────────────────────────────────────────────────────
+    # ── Episodes sweep ───────────────────────────────────────────────────
     Strategy("ep_12k",           ["linear", "ep=12k"],       episodes=12000),
     Strategy("ep_20k",           ["linear", "ep=20k"],       episodes=20000),
     # ── MLP architectures ────────────────────────────────────────────────
     Strategy("mlp_32",           ["mlp", "h=32"],            policy="mlp", hidden_dim=32),
     Strategy("mlp_64",           ["mlp", "h=64"],            policy="mlp", hidden_dim=64),
     Strategy("mlp_128",          ["mlp", "h=128"],           policy="mlp", hidden_dim=128),
-    # ── MLP + hyperparams ────────────────────────────────────────────────
-    Strategy("mlp_64_hlr",       ["mlp", "h=64", "lr=0.02"], policy="mlp", hidden_dim=64, lr=0.02),
-    Strategy("mlp_64_ep12k",     ["mlp", "h=64", "ep=12k"],  policy="mlp", hidden_dim=64, episodes=12000),
-    Strategy("mlp_128_hlr",      ["mlp", "h=128", "lr=0.02"],policy="mlp", hidden_dim=128, lr=0.02),
-    Strategy("mlp_32_k8",        ["mlp", "h=32", "k=8"],     policy="mlp", hidden_dim=32, k_max=8),
-    # ── Combined best combinations ───────────────────────────────────────
-    Strategy("linear_hlr_ep12k", ["linear", "lr=0.02", "ep=12k"], lr=0.02, episodes=12000),
-    Strategy("linear_hlr_k32",   ["linear", "lr=0.02", "k=32"],   lr=0.02, k_max=32),
-    # ── Replicate near-best prior random search configs ──────────────────
-    # Trial 493 (best val ever): linear lr=0.015, entropy=0.078, k=50, ep=4k
-    Strategy("best493_clone",    ["linear", "lr=0.015", "entropy=0.078", "k=50", "ep=4k"],
-             lr=0.015, entropy_coef=0.078, k_max=50, episodes=4000),
-    # Trial 138 (best val+test both positive): linear lr=0.061, entropy=0.059, k=20, ep=4k
-    Strategy("best138_clone",    ["linear", "lr=0.061", "entropy=0.059", "k=20", "ep=4k"],
-             lr=0.061, entropy_coef=0.059, k_max=20, episodes=4000),
-    # Trial 41: linear lr=0.095, entropy=0.354, k=20, ep=16k
-    Strategy("best41_clone",     ["linear", "lr=0.095", "entropy=0.354", "k=20", "ep=16k"],
-             lr=0.095, entropy_coef=0.354, k_max=20, episodes=16000),
-    # Trial 234: mlp h=256 lr=0.0006, entropy=0.271, k=8, ep=16k
-    Strategy("best234_clone",    ["mlp", "h=256", "lr=0.0006", "entropy=0.271", "k=8", "ep=16k"],
-             policy="mlp", hidden_dim=256, lr=0.0006, entropy_coef=0.271, k_max=8, episodes=16000),
-    # ── MLP h=256 (consistently top-2 in prior random search) ────────────
-    Strategy("mlp_256",          ["mlp", "h=256"],               policy="mlp", hidden_dim=256),
-    Strategy("mlp_256_hlr",      ["mlp", "h=256", "lr=0.02"],    policy="mlp", hidden_dim=256, lr=0.02),
-    Strategy("mlp_256_k8",       ["mlp", "h=256", "k=8"],        policy="mlp", hidden_dim=256, k_max=8),
-    # ── k=50 combos (k=50 in top-3 of prior search) ──────────────────────
-    Strategy("linear_hlr_k50",   ["linear", "lr=0.02", "k=50"],  lr=0.02, k_max=50),
-    Strategy("mlp_128_k50",      ["mlp", "h=128", "k=50"],       policy="mlp", hidden_dim=128, k_max=50),
-    Strategy("mlp_64_k50",       ["mlp", "h=64", "k=50"],        policy="mlp", hidden_dim=64, k_max=50),
-    # ── More episodes (16k/20k found better val in prior search) ─────────
-    Strategy("linear_ep16k",     ["linear", "ep=16k"],            episodes=16000),
-    Strategy("mlp_128_ep16k",    ["mlp", "h=128", "ep=16k"],     policy="mlp", hidden_dim=128, episodes=16000),
-    # ── Post-REINFORCE-fix: low entropy now optimal (gradient works) ──────
-    # Before fix: entropy was the only training signal → high entropy helped.
-    # After fix: reward gradient is active → entropy should be small (0.001-0.01).
-    Strategy("fixed_low_ent",    ["linear", "lr=0.02", "entropy=0.002", "k=20", "ep=10k"],
-             lr=0.02, entropy_coef=0.002, k_max=20, episodes=10000),
-    Strategy("fixed_low_ent_k8", ["linear", "lr=0.02", "entropy=0.002", "k=8", "ep=10k"],
-             lr=0.02, entropy_coef=0.002, k_max=8, episodes=10000),
-    Strategy("fixed_mlp_low_ent",["mlp", "h=128", "lr=0.01", "entropy=0.002", "k=20", "ep=10k"],
-             policy="mlp", hidden_dim=128, lr=0.01, entropy_coef=0.002, k_max=20, episodes=10000),
-    Strategy("fixed_zero_ent",   ["linear", "lr=0.02", "entropy=0", "k=20", "ep=10k"],
-             lr=0.02, entropy_coef=0.0, k_max=20, episodes=10000),
-    # ── Post-fix: longer training (gradient didn't vanish → more ep helps) ─
-    Strategy("linear_ep24k",     ["linear", "lr=0.01", "ep=24k"], lr=0.01, episodes=24000),
-    Strategy("mlp_128_ep24k",    ["mlp", "h=128", "lr=0.01", "ep=24k"],
-             policy="mlp", hidden_dim=128, lr=0.01, episodes=24000),
-    # ── Post-fix: k=4 (very targeted — agent may now find the right combo) ─
-    Strategy("linear_k4",        ["linear", "lr=0.02", "k=4"],   lr=0.02, k_max=4),
-    Strategy("mlp_128_k4",       ["mlp", "h=128", "lr=0.02", "k=4"],
-             policy="mlp", hidden_dim=128, lr=0.02, k_max=4),
-    # ── mlp_32 neighbourhood: only winner so far — sweep its hyperparams ──
-    Strategy("mlp_32_lr_mid",     ["mlp", "h=32", "lr=0.01"],
-             policy="mlp", hidden_dim=32, lr=0.01),
-    Strategy("mlp_32_lr_high",    ["mlp", "h=32", "lr=0.02"],
-             policy="mlp", hidden_dim=32, lr=0.02),
-    Strategy("mlp_32_low_ent",    ["mlp", "h=32", "entropy=0.01"],
-             policy="mlp", hidden_dim=32, entropy_coef=0.01),
-    Strategy("mlp_32_ep12k",      ["mlp", "h=32", "ep=12k"],
-             policy="mlp", hidden_dim=32, episodes=12000),
-    Strategy("mlp_32_ep16k",      ["mlp", "h=32", "ep=16k"],
-             policy="mlp", hidden_dim=32, episodes=16000),
-    Strategy("mlp_32_k16",        ["mlp", "h=32", "k=16"],
-             policy="mlp", hidden_dim=32, k_max=16),
-    Strategy("mlp_32_lr_mid_k16", ["mlp", "h=32", "lr=0.01", "k=16"],
-             policy="mlp", hidden_dim=32, lr=0.01, k_max=16),
-    Strategy("mlp_32_lr_high_k8", ["mlp", "h=32", "lr=0.02", "k=8"],
-             policy="mlp", hidden_dim=32, lr=0.02, k_max=8),
-    # ── Correctness bonus: dense aux reward to escape sparse-prize regime ──
-    # Prize hits are ~1-2% per round; correctness gives signal every episode.
-    Strategy("corr_01_linear",    ["linear", "lr=0.01", "corr=0.1", "k=20", "ep=10k"],
-             lr=0.01, correctness_coef=0.1, k_max=20, episodes=10000),
-    Strategy("corr_01_mlp32",     ["mlp", "h=32", "lr=0.005", "corr=0.1", "k=20", "ep=10k"],
-             policy="mlp", hidden_dim=32, correctness_coef=0.1, k_max=20, episodes=10000),
-    Strategy("corr_02_linear",    ["linear", "lr=0.01", "corr=0.2", "k=20", "ep=10k"],
-             lr=0.01, correctness_coef=0.2, k_max=20, episodes=10000),
-    Strategy("corr_02_mlp32",     ["mlp", "h=32", "lr=0.005", "corr=0.2", "k=20", "ep=10k"],
-             policy="mlp", hidden_dim=32, correctness_coef=0.2, k_max=20, episodes=10000),
-    Strategy("corr_05_linear_k8", ["linear", "lr=0.01", "corr=0.5", "k=8", "ep=16k"],
-             lr=0.01, correctness_coef=0.5, k_max=8, episodes=16000),
-    Strategy("corr_05_mlp32_k8",  ["mlp", "h=32", "lr=0.01", "corr=0.5", "k=8", "ep=16k"],
-             policy="mlp", hidden_dim=32, lr=0.01, correctness_coef=0.5, k_max=8, episodes=16000),
-    # ── Near best test-generalising configs found in random search ─────────
-    # random_34: linear, lr=0.088, entropy=0.113, k=32, ep=16k → test=+1.21 (ONLY positive test)
-    Strategy("gen_r34_clone",     ["linear", "lr=0.088", "entropy=0.113", "k=32", "ep=16k"],
-             lr=0.088, entropy_coef=0.113, k_max=32, episodes=16000),
-    Strategy("gen_r34_lr_low",    ["linear", "lr=0.06", "entropy=0.11", "k=32", "ep=16k"],
-             lr=0.06, entropy_coef=0.11, k_max=32, episodes=16000),
-    Strategy("gen_r34_k24",       ["linear", "lr=0.088", "entropy=0.113", "k=24", "ep=16k"],
-             lr=0.088, entropy_coef=0.113, k_max=24, episodes=16000),
-    Strategy("gen_r34_ep12k",     ["linear", "lr=0.088", "entropy=0.113", "k=32", "ep=12k"],
-             lr=0.088, entropy_coef=0.113, k_max=32, episodes=12000),
-    # mlp_128_hlr: mlp h=128, lr=0.02, k=20 → test=-0.54 (near breakeven)
-    Strategy("gen_mlp128_k32",    ["mlp", "h=128", "lr=0.02", "k=32"],
-             policy="mlp", hidden_dim=128, lr=0.02, k_max=32),
-    Strategy("gen_mlp128_lr_mid", ["mlp", "h=128", "lr=0.04", "k=20"],
-             policy="mlp", hidden_dim=128, lr=0.04, k_max=20),
-    Strategy("gen_mlp128_ep16k",  ["mlp", "h=128", "lr=0.02", "k=20", "ep=16k"],
-             policy="mlp", hidden_dim=128, lr=0.02, k_max=20, episodes=16000),
-    # random_83: mlp h=256, lr=0.086, k=20, ep=4k → test=-1.14
-    Strategy("gen_mlp256_hlr",    ["mlp", "h=256", "lr=0.086", "k=20", "ep=4k"],
-             policy="mlp", hidden_dim=256, lr=0.086, k_max=20, episodes=4000),
-    Strategy("gen_mlp256_k32",    ["mlp", "h=256", "lr=0.086", "k=32", "ep=4k"],
-             policy="mlp", hidden_dim=256, lr=0.086, k_max=32, episodes=4000),
-    # ── mlp_256 low-lr stable zone (trial 114: val=+5.69 AND test=-1.00) ──
-    # This is the ONLY trial where both val>0 and test≈0 simultaneously.
-    # The combination mlp h=256 + low lr (0.005-0.010) + k=20 is the sweet spot.
-    Strategy("stable_256_lr005",  ["mlp", "h=256", "lr=0.005", "k=20", "ep=10k"],
-             policy="mlp", hidden_dim=256, lr=0.005, k_max=20, episodes=10000),
-    Strategy("stable_256_lr006",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=10k"],
-             policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=10000),
-    Strategy("stable_256_lr008",  ["mlp", "h=256", "lr=0.008", "k=20", "ep=10k"],
-             policy="mlp", hidden_dim=256, lr=0.008, k_max=20, episodes=10000),
-    Strategy("stable_256_k16",    ["mlp", "h=256", "lr=0.006", "k=16", "ep=10k"],
-             policy="mlp", hidden_dim=256, lr=0.006, k_max=16, episodes=10000),
-    Strategy("stable_256_k32",    ["mlp", "h=256", "lr=0.006", "k=32", "ep=10k"],
-             policy="mlp", hidden_dim=256, lr=0.006, k_max=32, episodes=10000),
-    Strategy("stable_256_ep16k",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=16k"],
-             policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=16000),
-    Strategy("stable_256_ep24k",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=24k"],
-             policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=24000),
-    # ── Test-generalisers discovered under new avg(val,test) score formula ─
-    # random_129: linear lr=0.093, entropy=0.087, k=50, ep=16k → test=+182 (best test ever)
-    Strategy("t129_clone",   ["linear", "lr=0.093", "entropy=0.087", "k=50", "ep=16k"],
-             lr=0.093, entropy_coef=0.087, k_max=50, episodes=16000),
-    Strategy("t129_lr_low",  ["linear", "lr=0.06", "entropy=0.087", "k=50", "ep=16k"],
-             lr=0.06, entropy_coef=0.087, k_max=50, episodes=16000),
-    Strategy("t129_lr_high", ["linear", "lr=0.12", "entropy=0.087", "k=50", "ep=16k"],
-             lr=0.12, entropy_coef=0.087, k_max=50, episodes=16000),
-    Strategy("t129_k32",     ["linear", "lr=0.093", "entropy=0.087", "k=32", "ep=16k"],
-             lr=0.093, entropy_coef=0.087, k_max=32, episodes=16000),
-    Strategy("t129_ep24k",   ["linear", "lr=0.093", "entropy=0.087", "k=50", "ep=24k"],
-             lr=0.093, entropy_coef=0.087, k_max=50, episodes=24000),
-    # random_106: linear lr=0.0008, entropy=0.189, k=50, ep=16k → test=+176
-    Strategy("t106_clone",   ["linear", "lr=0.0008", "entropy=0.189", "k=50", "ep=16k"],
-             lr=0.0008, entropy_coef=0.189, k_max=50, episodes=16000),
-    Strategy("t106_lr_mid",  ["linear", "lr=0.003", "entropy=0.189", "k=50", "ep=16k"],
-             lr=0.003, entropy_coef=0.189, k_max=50, episodes=16000),
-    Strategy("t106_ent_low", ["linear", "lr=0.0008", "entropy=0.05", "k=50", "ep=16k"],
-             lr=0.0008, entropy_coef=0.05, k_max=50, episodes=16000),
-    # random_121: linear lr=0.010, entropy=0.018, k=32, ep=10k → test=+119
-    Strategy("t121_clone",   ["linear", "lr=0.010", "entropy=0.018", "k=32", "ep=10k"],
-             lr=0.010, entropy_coef=0.018, k_max=32, episodes=10000),
-    Strategy("t121_k50",     ["linear", "lr=0.010", "entropy=0.018", "k=50", "ep=10k"],
-             lr=0.010, entropy_coef=0.018, k_max=50, episodes=10000),
-    Strategy("t121_ep16k",   ["linear", "lr=0.010", "entropy=0.018", "k=32", "ep=16k"],
-             lr=0.010, entropy_coef=0.018, k_max=32, episodes=16000),
+    Strategy("mlp_256",          ["mlp", "h=256"],           policy="mlp", hidden_dim=256),
+    # ── Combined sweeps ──────────────────────────────────────────────────
+    Strategy("linear_hlr_ep12k", ["linear", "lr=0.02", "ep=12k"],  lr=0.02, episodes=12000),
+    Strategy("linear_hlr_k32",   ["linear", "lr=0.02", "k=32"],    lr=0.02, k_max=32),
+    Strategy("linear_hlr_k50",   ["linear", "lr=0.02", "k=50"],    lr=0.02, k_max=50),
+    Strategy("linear_ep16k",     ["linear", "ep=16k"],              episodes=16000),
+    Strategy("mlp_128_hlr",      ["mlp", "h=128", "lr=0.02"],      policy="mlp", hidden_dim=128, lr=0.02),
+    Strategy("mlp_128_k50",      ["mlp", "h=128", "k=50"],         policy="mlp", hidden_dim=128, k_max=50),
+    Strategy("mlp_128_ep16k",    ["mlp", "h=128", "ep=16k"],       policy="mlp", hidden_dim=128, episodes=16000),
+    Strategy("mlp_256_hlr",      ["mlp", "h=256", "lr=0.02"],      policy="mlp", hidden_dim=256, lr=0.02),
+    Strategy("mlp_256_k8",       ["mlp", "h=256", "k=8"],          policy="mlp", hidden_dim=256, k_max=8),
 ]
 
 
