@@ -48,7 +48,7 @@ from train import (
 BEST_MODEL_PATH = "agent_best.npz"
 LEADERBOARD_PATH = "leaderboard.json"
 SUMMARIES_PATH = "summaries.json"
-CLAUDE_MD_PATH = "CLAUDE.md"
+CLAUDE_MD_PATH = "README.md"   # always the dataset README, never root CLAUDE.md
 LOG_PATH = "improve.log"
 FIGURES_PATH = "improvement.png"
 
