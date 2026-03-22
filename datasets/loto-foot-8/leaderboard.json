@@ -21,5 +21,25 @@
     "model_path": "datasets/loto-foot-8/agent_best.npz",
     "timestamp": "2026-03-22 15:03",
     "commit_hash": "32a45d2"
+  },
+  {
+    "trial": 2,
+    "strategy_name": "lr_high",
+    "keywords": [
+      "linear",
+      "lr=0.02"
+    ],
+    "val_net_per_round": -7.5,
+    "val_round_hit_rate": 0.0588,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -16.44,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -11.2794,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:03",
+    "commit_hash": "3494b88"
   }
 ]
