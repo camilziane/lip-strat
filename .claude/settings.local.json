@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls datasets/loto-foot-8*)",
+      "Bash(jobs)",
+      "Bash(tasklist)",
+      "Bash(uv run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(python -c \":*)",
+      "Bash(uv run python -c \":*)",
+      "Bash(/dev/null grep:*)",
+      "Bash(/dev/null echo:*)"
+    ]
+  }
+}
