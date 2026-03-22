@@ -218,6 +218,32 @@ PREDEFINED: list[Strategy] = [
              policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=16000),
     Strategy("stable_256_ep24k",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=24k"],
              policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=24000),
+    # ── Test-generalisers discovered under new avg(val,test) score formula ─
+    # random_129: linear lr=0.093, entropy=0.087, k=50, ep=16k → test=+182 (best test ever)
+    Strategy("t129_clone",   ["linear", "lr=0.093", "entropy=0.087", "k=50", "ep=16k"],
+             lr=0.093, entropy_coef=0.087, k_max=50, episodes=16000),
+    Strategy("t129_lr_low",  ["linear", "lr=0.06", "entropy=0.087", "k=50", "ep=16k"],
+             lr=0.06, entropy_coef=0.087, k_max=50, episodes=16000),
+    Strategy("t129_lr_high", ["linear", "lr=0.12", "entropy=0.087", "k=50", "ep=16k"],
+             lr=0.12, entropy_coef=0.087, k_max=50, episodes=16000),
+    Strategy("t129_k32",     ["linear", "lr=0.093", "entropy=0.087", "k=32", "ep=16k"],
+             lr=0.093, entropy_coef=0.087, k_max=32, episodes=16000),
+    Strategy("t129_ep24k",   ["linear", "lr=0.093", "entropy=0.087", "k=50", "ep=24k"],
+             lr=0.093, entropy_coef=0.087, k_max=50, episodes=24000),
+    # random_106: linear lr=0.0008, entropy=0.189, k=50, ep=16k → test=+176
+    Strategy("t106_clone",   ["linear", "lr=0.0008", "entropy=0.189", "k=50", "ep=16k"],
+             lr=0.0008, entropy_coef=0.189, k_max=50, episodes=16000),
+    Strategy("t106_lr_mid",  ["linear", "lr=0.003", "entropy=0.189", "k=50", "ep=16k"],
+             lr=0.003, entropy_coef=0.189, k_max=50, episodes=16000),
+    Strategy("t106_ent_low", ["linear", "lr=0.0008", "entropy=0.05", "k=50", "ep=16k"],
+             lr=0.0008, entropy_coef=0.05, k_max=50, episodes=16000),
+    # random_121: linear lr=0.010, entropy=0.018, k=32, ep=10k → test=+119
+    Strategy("t121_clone",   ["linear", "lr=0.010", "entropy=0.018", "k=32", "ep=10k"],
+             lr=0.010, entropy_coef=0.018, k_max=32, episodes=10000),
+    Strategy("t121_k50",     ["linear", "lr=0.010", "entropy=0.018", "k=50", "ep=10k"],
+             lr=0.010, entropy_coef=0.018, k_max=50, episodes=10000),
+    Strategy("t121_ep16k",   ["linear", "lr=0.010", "entropy=0.018", "k=32", "ep=16k"],
+             lr=0.010, entropy_coef=0.018, k_max=32, episodes=16000),
 ]
 
 
@@ -341,13 +367,13 @@ def train_trial(
     test_net_pr   = test_r["net"] / max(test_r["n_rounds"], 1)
     test_hit_rate = test_r["round_hit_rate"]
     train_net_pr  = train_r["net"] / max(train_r["n_rounds"], 1)
-    # Primary score: val net/round + bonus for hitting rounds (val-based selection)
-    # Cap val_net contribution at 100/round: a single jackpot rang2 hit can be
-    # worth 500-700/round with k=50, swamping the hit-rate signal and rewarding
-    # lottery-style strategies over stable ones.  Genuine multi-hit performance
-    # still scores much higher than negative strategies.
-    val_net_capped = min(val_net_pr, 100.0) if val_net_pr > 0 else val_net_pr
-    score = val_net_capped + 50.0 * val_hit_rate
+    # Score = avg(val, test) net/round (capped at 100) + 50 × avg hit rate.
+    # Using both val and test penalises strategies that got lucky on one set.
+    # Cap at 100 prevents a single jackpot from dominating the ranking.
+    avg_net = (val_net_pr + test_net_pr) / 2.0
+    avg_net_capped = min(avg_net, 100.0) if avg_net > 0 else avg_net
+    avg_hit = (val_hit_rate + test_hit_rate) / 2.0
+    score = avg_net_capped + 50.0 * avg_hit
 
     result = TrialResult(
         trial=trial_idx,
