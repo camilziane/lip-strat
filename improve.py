@@ -70,6 +70,7 @@ class Strategy:
     hidden_dim: int = 64
     lr: float = 0.005
     entropy_coef: float = 0.05
+    entropy_coef_start: float = 0.0 # if > 0, anneal entropy from this value down to entropy_coef
     k_max: int = 20
     episodes: int = 6000
     correctness_coef: float = 0.0   # dense aux reward: bonus per correct match in each combo
@@ -115,6 +116,18 @@ PREDEFINED: list[Strategy] = [
     Strategy("mlp_32_s5",        ["mlp", "h=32", "seeds=5"],        policy="mlp", hidden_dim=32, n_seeds=5),
     Strategy("k32_elr_s5",       ["linear", "k=32", "entropy=0.01", "seeds=5"],
              k_max=32, entropy_coef=0.01, n_seeds=5),
+    # ── Entropy annealing ────────────────────────────────────────────────
+    # Start with high entropy (broad coverage), anneal to low (focused bets)
+    Strategy("anneal_k32",       ["linear", "anneal=0.3->0.01", "k=32"],
+             entropy_coef=0.01, entropy_coef_start=0.3, k_max=32),
+    Strategy("anneal_k20",       ["linear", "anneal=0.3->0.01", "k=20"],
+             entropy_coef=0.01, entropy_coef_start=0.3),
+    Strategy("anneal_k32_ep12k", ["linear", "anneal=0.3->0.01", "k=32", "ep=12k"],
+             entropy_coef=0.01, entropy_coef_start=0.3, k_max=32, episodes=12000),
+    Strategy("anneal_mlp_k32",   ["mlp", "h=64", "anneal=0.3->0.01", "k=32"],
+             policy="mlp", hidden_dim=64, entropy_coef=0.01, entropy_coef_start=0.3, k_max=32),
+    Strategy("anneal_k32_s3",    ["linear", "anneal=0.3->0.01", "k=32", "seeds=3"],
+             entropy_coef=0.01, entropy_coef_start=0.3, k_max=32, n_seeds=3),
 ]
 
 
@@ -129,17 +142,24 @@ def random_strategy(rng: np.random.Generator, trial_idx: int) -> Strategy:
     # 40% of random trials use correctness bonus to explore the dense-reward regime
     corr = float(rng.choice([0.0, 0.0, 0.0, 0.1, 0.2, 0.5]))
     n_seeds = int(rng.choice([1, 1, 1, 3, 5]))   # 40% chance of multi-seed
+    # 33% of random trials use entropy annealing
+    do_anneal = bool(rng.choice([False, False, True]))
+    entropy_start = float(np.exp(rng.uniform(np.log(0.1), np.log(0.5)))) if do_anneal else 0.0
     name = f"random_{trial_idx}"
     keywords = [policy, f"h={hidden}" if policy == "mlp" else "",
-                f"lr={lr:.4f}", f"entropy={entropy:.3f}", f"k={k}", f"ep={episodes//1000}k"]
+                f"lr={lr:.4f}", f"k={k}", f"ep={episodes//1000}k"]
+    if do_anneal:
+        keywords.append(f"anneal={entropy_start:.2f}->{entropy:.3f}")
+    else:
+        keywords.append(f"entropy={entropy:.3f}")
     if corr > 0:
         keywords.append(f"corr={corr}")
     if n_seeds > 1:
         keywords.append(f"seeds={n_seeds}")
     keywords = [kw for kw in keywords if kw]
     return Strategy(name, keywords, policy=policy, hidden_dim=hidden,
-                    lr=lr, entropy_coef=entropy, k_max=k, episodes=episodes,
-                    correctness_coef=corr, n_seeds=n_seeds)
+                    lr=lr, entropy_coef=entropy, entropy_coef_start=entropy_start,
+                    k_max=k, episodes=episodes, correctness_coef=corr, n_seeds=n_seeds)
 
 
 # ---------------------------------------------------------------------------
@@ -215,8 +235,19 @@ def train_trial(
         ag = build_agent(strategy, n_matches, s)
         if init_model_path and os.path.exists(init_model_path):
             _warm_start(ag, init_model_path)
+        # Entropy annealing: if entropy_coef_start > 0, linearly anneal from
+        # entropy_coef_start down to entropy_coef over training.
+        use_annealing = strategy.entropy_coef_start > 0.0
+        if use_annealing:
+            ag.entropy_coef = strategy.entropy_coef_start
         o, _ = train_env.reset(seed=s)
         for ep in range(1, strategy.episodes + 1):
+            if use_annealing:
+                t = ep / strategy.episodes
+                ag.entropy_coef = (
+                    strategy.entropy_coef_start * (1.0 - t)
+                    + strategy.entropy_coef * t
+                )
             action = ag.act(o)
             _, _, _, _, info = train_env.step(action)
             rw = info["per_combo_rewards"]
