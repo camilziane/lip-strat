@@ -15,6 +15,7 @@ uv run python improve.py --dataset-dir datasets/<name>             # run forever
 uv run python improve.py --dataset-dir datasets/<name> --max-trials 30
 uv run python improve.py --dataset-dir datasets/<name> \
     --init-model datasets/<other>/agent_best.npz                   # warm-start
+uv run python improve.py --dataset-dir datasets/<name> --reset     # clear all state & commit
 
 uv run python dashboard.py                                         # http://localhost:8765
 uv run python train.py --episodes 10000 --lr 0.02 --entropy-coef 0.1
@@ -58,9 +59,42 @@ Run on a dedicated branch. Modify only `train.py` and `improve.py` — never `en
 git checkout -b autoresearch/YYYY-MMdd
 ```
 
-Loop:
-1. Baseline: `uv run python improve.py --dataset-dir datasets/<name> --max-trials 5 > run.log 2>&1`
-2. Read result: `grep "score=" run.log | tail -3`
-3. Form hypothesis → edit code → `git commit` → run → record in `datasets/<name>/results.tsv`
+### Startup (once per session)
+
+Before the first run, create two files in the dataset dir:
+
+**`datasets/<name>/results.tsv`** — experiment log (untracked, never reset):
+```
+commit	score	memory_gb	status	description
+```
+
+**`datasets/<name>/README.md`** — living document (tracked). Initialise with:
+- Current architecture snapshot (policy type, features, reward formula, split)
+- Data range (parse from xlsx filename)
+- Empty leaderboard and history sections (with HTML comment markers)
+- What to try next section
+
+The README must be kept up to date throughout the session:
+- After every new best: `improve.py` auto-updates the leaderboard table
+- After every hypothesis run: add a note to "What was tried" even if it failed
+- After any architecture change: update the Architecture section
+
+### Loop
+
+1. Baseline: `uv run python improve.py --dataset-dir datasets/<name> --max-trials 5 > datasets/<name>/run.log 2>&1`
+2. Read result: `grep "score=" datasets/<name>/run.log | tail -5`
+3. Form hypothesis → edit code → `git commit` → run → record in `results.tsv`
 4. Score improved → keep; otherwise `git reset --hard HEAD~1`
 5. Never stop or ask for confirmation
+
+### Mindset — you have full creative freedom
+
+You are not limited to parameter sweeps. At any point you may:
+
+- **Redesign the reward function** — e.g. penalise variance, reward partial matches, use a shaped proxy signal
+- **Add new features** to the observation — derived statistics, historical hit rates, value bets ratios. If you need raw columns that are not currently exposed by `env.py`, **ask the user** to add them (describe exactly what you need and why it would help)
+- **Replace the RL algorithm** — e.g. switch from REINFORCE to PPO, Actor-Critic, evolutionary strategies, or a pure supervised approach if labelled data is available
+- **Change the action space** — e.g. output a probability distribution over k-subsets rather than independent Bernoulli masks
+- **Request more data** — ask the user if a larger or more recent xlsx file is available, or if additional context (team rankings, weather, odds history) can be exported
+
+When you hit a wall (val/test gap, reward always -18, no signal from random search), step back and rethink the whole approach rather than tweaking hyperparameters. Write your reasoning in README.md before implementing.
