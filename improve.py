@@ -73,6 +73,7 @@ class Strategy:
     k_max: int = 20
     episodes: int = 6000
     correctness_coef: float = 0.0   # dense aux reward: bonus per correct match in each combo
+    n_seeds: int = 1                # train this many seeds, keep best val score
 
 
 PREDEFINED: list[Strategy] = [
@@ -108,6 +109,12 @@ PREDEFINED: list[Strategy] = [
     Strategy("mlp_128_ep16k",    ["mlp", "h=128", "ep=16k"],       policy="mlp", hidden_dim=128, episodes=16000),
     Strategy("mlp_256_hlr",      ["mlp", "h=256", "lr=0.02"],      policy="mlp", hidden_dim=256, lr=0.02),
     Strategy("mlp_256_k8",       ["mlp", "h=256", "k=8"],          policy="mlp", hidden_dim=256, k_max=8),
+    # ── Multi-seed (best-of-N) ────────────────────────────────────────────
+    Strategy("k32_s5",           ["linear", "k=32", "seeds=5"],     k_max=32, n_seeds=5),
+    Strategy("entropy_low_s5",   ["linear", "entropy=0.01", "seeds=5"], entropy_coef=0.01, n_seeds=5),
+    Strategy("mlp_32_s5",        ["mlp", "h=32", "seeds=5"],        policy="mlp", hidden_dim=32, n_seeds=5),
+    Strategy("k32_elr_s5",       ["linear", "k=32", "entropy=0.01", "seeds=5"],
+             k_max=32, entropy_coef=0.01, n_seeds=5),
 ]
 
 
@@ -121,15 +128,18 @@ def random_strategy(rng: np.random.Generator, trial_idx: int) -> Strategy:
     episodes = int(rng.choice([6000, 10000, 16000, 24000]))
     # 40% of random trials use correctness bonus to explore the dense-reward regime
     corr = float(rng.choice([0.0, 0.0, 0.0, 0.1, 0.2, 0.5]))
+    n_seeds = int(rng.choice([1, 1, 1, 3, 5]))   # 40% chance of multi-seed
     name = f"random_{trial_idx}"
     keywords = [policy, f"h={hidden}" if policy == "mlp" else "",
                 f"lr={lr:.4f}", f"entropy={entropy:.3f}", f"k={k}", f"ep={episodes//1000}k"]
     if corr > 0:
         keywords.append(f"corr={corr}")
+    if n_seeds > 1:
+        keywords.append(f"seeds={n_seeds}")
     keywords = [kw for kw in keywords if kw]
     return Strategy(name, keywords, policy=policy, hidden_dim=hidden,
                     lr=lr, entropy_coef=entropy, k_max=k, episodes=episodes,
-                    correctness_coef=corr)
+                    correctness_coef=corr, n_seeds=n_seeds)
 
 
 # ---------------------------------------------------------------------------
@@ -201,26 +211,36 @@ def train_trial(
     eval_val   = LotoFootEnv(val_grids,   k_max=k, mode="eval")
     eval_test  = LotoFootEnv(test_grids,  k_max=k, mode="eval")
 
-    agent = build_agent(strategy, n_matches, seed)
-    if init_model_path and os.path.exists(init_model_path):
-        _warm_start(agent, init_model_path)
+    def _run_one_seed(s: int) -> REINFORCEAgent:
+        ag = build_agent(strategy, n_matches, s)
+        if init_model_path and os.path.exists(init_model_path):
+            _warm_start(ag, init_model_path)
+        o, _ = train_env.reset(seed=s)
+        for ep in range(1, strategy.episodes + 1):
+            action = ag.act(o)
+            _, _, _, _, info = train_env.step(action)
+            rw = info["per_combo_rewards"]
+            if strategy.correctness_coef > 0.0:
+                outcomes = info["outcomes"]
+                correctness = np.array([
+                    np.sum(c == outcomes) / n_matches
+                    for c in info["all_combos"]
+                ], dtype=np.float32)
+                rw = rw + strategy.correctness_coef * correctness
+            ag.update(o, action, rw, info["selections"])
+            o, _ = train_env.reset()
+        return ag
 
-    obs, _ = train_env.reset(seed=seed)
-    for ep in range(1, strategy.episodes + 1):
-        action = agent.act(obs)
-        _, _, _, _, info = train_env.step(action)
-        rewards = info["per_combo_rewards"]
-        if strategy.correctness_coef > 0.0:
-            # Dense auxiliary reward: fraction of matches correct per combo.
-            # Gives learning signal every episode, not just on rare prize hits.
-            outcomes = info["outcomes"]
-            correctness = np.array([
-                np.sum(c == outcomes) / n_matches
-                for c in info["all_combos"]
-            ], dtype=np.float32)
-            rewards = rewards + strategy.correctness_coef * correctness
-        agent.update(obs, action, rewards, info["selections"])
-        obs, _ = train_env.reset()
+    # Train n_seeds agents; keep the one with the best val score
+    best_agent, best_val_net = None, -np.inf
+    for si in range(strategy.n_seeds):
+        ag = _run_one_seed(seed + si)
+        v = _collect_results(LotoFootEnv(val_grids, k_max=k, mode="eval"),
+                             lambda o, a=ag: a.act(o, deterministic=True))
+        vn = v["net"] / max(v["n_rounds"], 1)
+        if vn > best_val_net:
+            best_val_net, best_agent = vn, ag
+    agent = best_agent
 
     train_r = _collect_results(eval_train, lambda o: agent.act(o, deterministic=True))
     val_r   = _collect_results(eval_val,   lambda o: agent.act(o, deterministic=True))
@@ -631,6 +651,8 @@ def main() -> None:
     parser.add_argument("--max-trials",  type=int, default=0,
                         help="Stop after N trials (0 = run forever)")
     parser.add_argument("--seed",        type=int, default=42)
+    parser.add_argument("--reset",       action="store_true",
+                        help="Clear all dataset state (leaderboard, model, logs) and exit")
     args = parser.parse_args()
 
     # ── Override global output paths to dataset_dir ───────────────────────
@@ -645,6 +667,33 @@ def main() -> None:
         LOG_PATH         = os.path.join(d, "improve.log")
         FIGURES_PATH     = os.path.join(d, "improvement.png")
         CLAUDE_MD_PATH   = os.path.join(d, "README.md")
+
+    # ── Reset mode ────────────────────────────────────────────────────────
+    if args.reset:
+        cleared = []
+        for path, empty in [
+            (LEADERBOARD_PATH, "[]"),
+            (SUMMARIES_PATH,   "[]"),
+            (LOG_PATH,         ""),
+        ]:
+            with open(path, "w") as f:
+                f.write(empty)
+            cleared.append(path)
+        results_tsv = os.path.join(d, "results.tsv")
+        with open(results_tsv, "w") as f:
+            f.write("commit\tscore\tmemory_gb\tstatus\tdescription\n")
+        cleared.append(results_tsv)
+        for path in [BEST_MODEL_PATH, FIGURES_PATH]:
+            if os.path.exists(path):
+                os.remove(path)
+                cleared.append(path)
+        subprocess.run(["git", "add", LEADERBOARD_PATH, SUMMARIES_PATH], capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", f"reset: clear dataset state for {d}"],
+            capture_output=True,
+        )
+        print(f"Reset complete: {', '.join(cleared)}")
+        return
 
     # ── Auto-detect xlsx in dataset_dir if --file not given ───────────────
     if args.file is None:
