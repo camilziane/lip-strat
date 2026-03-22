@@ -81,5 +81,25 @@
     "agent_notes": "entropy_low (entropy=0.01) is the real breakthrough: val_hit=6% means 1/17 val rounds had a winning combo. The lower entropy forces the policy to commit to its best guess per match rather than spreading bets. Next priority: combine low entropy with larger k (32-50) to get more coverage while maintaining focused per-match picks, and try multi-seed to reduce variance. Also try entropy=0 and longer training.",
     "total_trials_so_far": 5,
     "commit": "62cf919"
+  },
+  {
+    "improvement_number": 4,
+    "trial": 8,
+    "strategy": "k8",
+    "keywords": [
+      "linear",
+      "k=8"
+    ],
+    "score": -7.2941,
+    "score_delta": 6.2912,
+    "val_net": -7.06,
+    "val_hit_pct": 0.0,
+    "test_net": -7.53,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 15:29",
+    "key_change": "Added: [k=8]  Removed: [entropy=0.01]",
+    "agent_notes": "",
+    "total_trials_so_far": 8,
+    "commit": "7278425"
   }
 ]

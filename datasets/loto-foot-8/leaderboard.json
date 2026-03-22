@@ -141,5 +141,25 @@
     "model_path": "datasets/loto-foot-8/agent_best.npz",
     "timestamp": "2026-03-22 15:29",
     "commit_hash": ""
+  },
+  {
+    "trial": 8,
+    "strategy_name": "k8",
+    "keywords": [
+      "linear",
+      "k=8"
+    ],
+    "val_net_per_round": -7.06,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -7.53,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -6.98,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -7.2941,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 15:29",
+    "commit_hash": "7278425"
   }
 ]
