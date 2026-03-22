@@ -15,14 +15,14 @@ Excel → load_data() → list[grid_dict]  (chronological)
          LotoFootEnv               REINFORCEAgent
          (env.py)                  (train.py)
               │                         │
-         observation (8×10)        _PolicyNet (PyTorch)
+         observation (8×11)        _PolicyNet (PyTorch)
               │                    logits → sigmoid → Bernoulli mask
          step(binary_mask)              │
               └── reward = (earnings − n_combos) / n_combos ───┘
 ```
 
-**Observation** — `n_matches × 10` per match:
-`implied_p1, implied_pN, implied_p2, rep1, repN, rep2, margin, log_spread, value1, value2`
+**Observation** — `n_matches × 11` per match:
+`implied_p1, implied_pN, implied_p2, rep1, repN, rep2, margin, log_spread, value1, valueN, value2`
 
 **Action** — `n_matches × 3` binary mask; total combos = product of per-match selections, capped at `k_max`
 
@@ -45,7 +45,6 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | b9e0642 |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -55,7 +54,6 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- HISTORY_START -->
 | # | Trial | Strategy | Score | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |---|-------|----------|-------|--------------|----------|----------------|-----------|--------|
-| 1 | 1 | `baseline` | -17.9 | $-17.76 | 0% | $-18.00 | 0% | b9e0642 |
 <!-- HISTORY_END -->
 
 ---
@@ -70,15 +68,14 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 ## Key Observations
 
 - **All strategies lose money most of the time** — prizes are sparse (rang1 requires 8/8 correct)
-- **k=8 is the most consistent** — loses ~6€/round on both val and test
-- **Val/test split is very noisy** — 17 rounds each means 1 winning round = 6% hit rate; results have high variance
+- **Val/test split is very noisy** — 17 rounds each means 1 winning round ≈ 6% hit rate; results have high variance
 
 ---
 
 ## What to Try Next
 
-1. **entropy_high + k=32** — combine high entropy coverage with more combinations per round
-2. **Run multi-seed strategies** — run `--max-trials 30` to reach k32_s5, entropy_low_s5 etc.
-3. **Rethink reward signal** — current reward is sparse; shaped reward (partial correctness bonus) could help learning
-4. **Ask user for more features** — current obs uses only odds + crowd %. Historical hit rates or team form could add signal
-5. **Value-based approach** — instead of RL, fit a model to predict P(prize | selections) directly from odds
+1. **Entropy sweep** — try entropy_coef ∈ {0.0, 0.01, 0.05, 0.2} to balance exploration vs exploitation
+2. **k_max sweep** — try k=8 (consistent loss) vs k=32/50 (more coverage, higher hit chance)
+3. **Multi-seed (n_seeds=5)** — reduce init-seed variance by keeping the best of 5 seeds
+4. **Dense reward** — add correctness_coef bonus to address sparse reward signal
+5. **Player consensus features** — run with `--extra-features player_consensus` to add top-50 player picks
