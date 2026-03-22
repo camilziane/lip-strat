@@ -126,6 +126,25 @@ PREDEFINED: list[Strategy] = [
     # ── More episodes (16k/20k found better val in prior search) ─────────
     Strategy("linear_ep16k",     ["linear", "ep=16k"],            episodes=16000),
     Strategy("mlp_128_ep16k",    ["mlp", "h=128", "ep=16k"],     policy="mlp", hidden_dim=128, episodes=16000),
+    # ── Post-REINFORCE-fix: low entropy now optimal (gradient works) ──────
+    # Before fix: entropy was the only training signal → high entropy helped.
+    # After fix: reward gradient is active → entropy should be small (0.001-0.01).
+    Strategy("fixed_low_ent",    ["linear", "lr=0.02", "entropy=0.002", "k=20", "ep=10k"],
+             lr=0.02, entropy_coef=0.002, k_max=20, episodes=10000),
+    Strategy("fixed_low_ent_k8", ["linear", "lr=0.02", "entropy=0.002", "k=8", "ep=10k"],
+             lr=0.02, entropy_coef=0.002, k_max=8, episodes=10000),
+    Strategy("fixed_mlp_low_ent",["mlp", "h=128", "lr=0.01", "entropy=0.002", "k=20", "ep=10k"],
+             policy="mlp", hidden_dim=128, lr=0.01, entropy_coef=0.002, k_max=20, episodes=10000),
+    Strategy("fixed_zero_ent",   ["linear", "lr=0.02", "entropy=0", "k=20", "ep=10k"],
+             lr=0.02, entropy_coef=0.0, k_max=20, episodes=10000),
+    # ── Post-fix: longer training (gradient didn't vanish → more ep helps) ─
+    Strategy("linear_ep24k",     ["linear", "lr=0.01", "ep=24k"], lr=0.01, episodes=24000),
+    Strategy("mlp_128_ep24k",    ["mlp", "h=128", "lr=0.01", "ep=24k"],
+             policy="mlp", hidden_dim=128, lr=0.01, episodes=24000),
+    # ── Post-fix: k=4 (very targeted — agent may now find the right combo) ─
+    Strategy("linear_k4",        ["linear", "lr=0.02", "k=4"],   lr=0.02, k_max=4),
+    Strategy("mlp_128_k4",       ["mlp", "h=128", "lr=0.02", "k=4"],
+             policy="mlp", hidden_dim=128, lr=0.02, k_max=4),
 ]
 
 
@@ -134,9 +153,9 @@ def random_strategy(rng: np.random.Generator, trial_idx: int) -> Strategy:
     policy = rng.choice(["linear", "mlp"])
     hidden = int(rng.choice([32, 64, 128, 256]))
     lr = float(np.exp(rng.uniform(np.log(5e-4), np.log(0.1))))
-    entropy = float(np.exp(rng.uniform(np.log(1e-3), np.log(0.5))))
-    k = int(rng.choice([8, 16, 20, 32, 50]))
-    episodes = int(rng.choice([4000, 6000, 10000, 16000]))
+    entropy = float(np.exp(rng.uniform(np.log(1e-4), np.log(0.3))))
+    k = int(rng.choice([4, 8, 16, 20, 32, 50]))
+    episodes = int(rng.choice([6000, 10000, 16000, 24000]))
     name = f"random_{trial_idx}"
     keywords = [policy, f"h={hidden}" if policy == "mlp" else "",
                 f"lr={lr:.4f}", f"entropy={entropy:.3f}", f"k={k}", f"ep={episodes//1000}k"]
