@@ -135,23 +135,25 @@ def split_data(
     seed: int = 42,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """
-    Randomly split grids into train / val / test sets.
+    Chronological split: oldest rounds → train, most recent → val → test.
 
-    Returns (train_grids, val_grids, test_grids).
+    Grids are assumed to be pre-sorted by date (load_data guarantees this).
+    Chronological split correctly simulates deployment: the agent is always
+    evaluated on rounds it could not have seen during training, matching how
+    a real bettor would use the model.
+
+    Random splitting (the previous behaviour) allowed future rounds to inform
+    training, making val/test scores misleading measures of out-of-sample
+    performance.
     """
-    rng = np.random.default_rng(seed)
     n = len(grids)
-    idx = rng.permutation(n)
-    n_test = max(1, round(n * test_ratio))
-    n_val  = max(1, round(n * val_ratio))
+    n_test  = max(1, round(n * test_ratio))
+    n_val   = max(1, round(n * val_ratio))
     n_train = max(1, n - n_val - n_test)
-    train_idx = sorted(idx[:n_train])
-    val_idx   = sorted(idx[n_train : n_train + n_val])
-    test_idx  = sorted(idx[n_train + n_val :])
     return (
-        [grids[i] for i in train_idx],
-        [grids[i] for i in val_idx],
-        [grids[i] for i in test_idx],
+        grids[:n_train],
+        grids[n_train : n_train + n_val],
+        grids[n_train + n_val :],
     )
 
 

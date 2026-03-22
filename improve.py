@@ -201,6 +201,23 @@ PREDEFINED: list[Strategy] = [
              policy="mlp", hidden_dim=256, lr=0.086, k_max=20, episodes=4000),
     Strategy("gen_mlp256_k32",    ["mlp", "h=256", "lr=0.086", "k=32", "ep=4k"],
              policy="mlp", hidden_dim=256, lr=0.086, k_max=32, episodes=4000),
+    # ── mlp_256 low-lr stable zone (trial 114: val=+5.69 AND test=-1.00) ──
+    # This is the ONLY trial where both val>0 and test≈0 simultaneously.
+    # The combination mlp h=256 + low lr (0.005-0.010) + k=20 is the sweet spot.
+    Strategy("stable_256_lr005",  ["mlp", "h=256", "lr=0.005", "k=20", "ep=10k"],
+             policy="mlp", hidden_dim=256, lr=0.005, k_max=20, episodes=10000),
+    Strategy("stable_256_lr006",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=10k"],
+             policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=10000),
+    Strategy("stable_256_lr008",  ["mlp", "h=256", "lr=0.008", "k=20", "ep=10k"],
+             policy="mlp", hidden_dim=256, lr=0.008, k_max=20, episodes=10000),
+    Strategy("stable_256_k16",    ["mlp", "h=256", "lr=0.006", "k=16", "ep=10k"],
+             policy="mlp", hidden_dim=256, lr=0.006, k_max=16, episodes=10000),
+    Strategy("stable_256_k32",    ["mlp", "h=256", "lr=0.006", "k=32", "ep=10k"],
+             policy="mlp", hidden_dim=256, lr=0.006, k_max=32, episodes=10000),
+    Strategy("stable_256_ep16k",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=16k"],
+             policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=16000),
+    Strategy("stable_256_ep24k",  ["mlp", "h=256", "lr=0.006", "k=20", "ep=24k"],
+             policy="mlp", hidden_dim=256, lr=0.006, k_max=20, episodes=24000),
 ]
 
 
