@@ -21,5 +21,45 @@
     "model_path": "datasets/loto-foot-8/agent_best.npz",
     "timestamp": "2026-03-22 13:34",
     "commit_hash": "f31f09b"
+  },
+  {
+    "trial": 2,
+    "strategy_name": "lr_high",
+    "keywords": [
+      "linear",
+      "lr=0.02"
+    ],
+    "val_net_per_round": -17.65,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -15.62,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -17.8235,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:34",
+    "commit_hash": "fc5d7a6"
+  },
+  {
+    "trial": 3,
+    "strategy_name": "lr_low",
+    "keywords": [
+      "linear",
+      "lr=0.001"
+    ],
+    "val_net_per_round": -18.0,
+    "val_round_hit_rate": 0.0,
+    "test_net_per_round": -18.0,
+    "test_round_hit_rate": 0.0,
+    "train_net_per_round": -11.36,
+    "n_train_rounds": 49,
+    "n_val_rounds": 17,
+    "n_test_rounds": 17,
+    "score": -18.0,
+    "model_path": "datasets/loto-foot-8/agent_best.npz",
+    "timestamp": "2026-03-22 13:34",
+    "commit_hash": ""
   }
 ]
