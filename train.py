@@ -66,21 +66,14 @@ def parse_cutoff_date(path: str) -> str | None:
 def load_data(
     path: str = EXCEL_FILE,
     loto_type: str | None = None,
-    cutoff_date: str | None = "auto",
 ) -> list[dict]:
     """
     Load all complete rounds from the Excel file.
 
     Parameters
     ----------
-    loto_type    : e.g. 'loto-foot-8'. If None, loads all types.
-    cutoff_date  : Only include grids with date ≤ cutoff_date.
-                   'auto' (default) parses the cutoff from the filename.
-                   None disables filtering.
+    loto_type : e.g. 'loto-foot-8'. If None, loads all types.
     """
-    if cutoff_date == "auto":
-        cutoff_date = parse_cutoff_date(path)
-
     df = pd.read_excel(path)
     if loto_type is not None:
         df = df[df["loto_type_name"] == loto_type]
@@ -131,11 +124,6 @@ def load_data(
         })
 
     grids.sort(key=lambda x: x["date"])
-
-    if cutoff_date is not None:
-        before = len(grids)
-        grids = [g for g in grids if g["date"] <= cutoff_date]
-        print(f"Cutoff date: {cutoff_date}  ({before} -> {len(grids)} rounds kept)")
 
     return grids
 
@@ -508,8 +496,6 @@ def main() -> None:
                         help="Entropy regularisation coefficient (default: 0.05)")
     parser.add_argument("--loto-type", type=str, default=None,
                         help="Filter by grid type, e.g. loto-foot-8 (default: auto-detect)")
-    parser.add_argument("--cutoff-date", type=str, default="auto",
-                        help="Max grid date for training (default: parsed from filename, e.g. 2026-03-21)")
     parser.add_argument("--save", type=str, default=None, metavar="PATH",
                         help="Save trained agent to this .npz file after training")
     parser.add_argument("--seed",         type=int, default=42)
@@ -518,7 +504,7 @@ def main() -> None:
     k = min(max(args.k_grids, 1), 50)
 
     # ---- Data ---------------------------------------------------------------
-    all_grids = load_data(loto_type=args.loto_type, cutoff_date=args.cutoff_date)
+    all_grids = load_data(loto_type=args.loto_type)
     if not all_grids:
         raise ValueError(f"No complete grids found (loto_type={args.loto_type!r})")
 
