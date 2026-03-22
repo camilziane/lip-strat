@@ -385,9 +385,16 @@ def save_leaderboard(board: list[dict]) -> None:
 
 
 def best_score(board: list[dict]) -> float:
-    if not board:
+    """Return the best score among *committed* entries only.
+
+    Uncommitted entries (no commit_hash) may result from a run that was
+    interrupted before git_commit() completed.  Including them would raise
+    the bar permanently and prevent future commits.
+    """
+    committed = [e for e in board if e.get("commit_hash")]
+    if not committed:
         return -np.inf
-    return max(e["score"] for e in board)
+    return max(e["score"] for e in committed)
 
 
 def update_claude_md(board: list[dict]) -> None:
@@ -774,9 +781,26 @@ def main() -> None:
 
     # ── Load existing leaderboard ─────────────────────────────────────────
     board = load_leaderboard()
-    current_best = best_score(board)
+    current_best = best_score(board)   # committed-only
     trial_offset = len(board)
     log(f"Leaderboard: {len(board)} entries  current_best_score={current_best:.4f}")
+
+    # ── Retroactively commit any uncommitted best from a previous interrupted run ──
+    uncommitted_bests = sorted(
+        [e for e in board if not e.get("commit_hash") and e["score"] > current_best],
+        key=lambda e: e["score"], reverse=True,
+    )
+    if uncommitted_bests and os.path.exists(BEST_MODEL_PATH):
+        top = uncommitted_bests[0]
+        log(f"   ↩ Found uncommitted best: trial={top['trial']} "
+            f"strategy={top['strategy_name']} score={top['score']:+.4f} — committing now")
+        fake_result = TrialResult(**{k: top[k] for k in TrialResult.__dataclass_fields__ if k in top})
+        commit_hash = git_commit(fake_result)
+        top["commit_hash"] = commit_hash
+        save_leaderboard(board)
+        update_claude_md(board)
+        current_best = top["score"]
+        log(f"   ↩ Committed as {commit_hash}  new current_best={current_best:.4f}")
 
     # ── Print last agent summary for context ──────────────────────────────
     summaries = load_summaries()
