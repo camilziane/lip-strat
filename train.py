@@ -213,6 +213,7 @@ class REINFORCEAgent:
         self.policy    = _PolicyNet(self.obs_dim, self.action_dim, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self._rng      = np.random.default_rng(seed)
+        self._reward_baseline = 0.0   # EMA baseline across episodes
 
     # ------------------------------------------------------------------
     # Action
@@ -273,8 +274,9 @@ class REINFORCEAgent:
         selections: np.ndarray,         # (n_matches, 3) bool from info dict
     ) -> None:
         """REINFORCE update via autograd: log-prob gradient + entropy bonus."""
-        baseline  = float(per_combo_rewards.mean())
-        advantage = float((per_combo_rewards - baseline).mean())
+        raw_reward = float(per_combo_rewards.mean())
+        advantage  = raw_reward - self._reward_baseline
+        self._reward_baseline += 0.05 * (raw_reward - self._reward_baseline)
 
         x      = torch.tensor(obs, dtype=torch.float32)
         logits = self.policy(x)
@@ -296,6 +298,7 @@ class REINFORCEAgent:
 
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=1.0)
         self.optimizer.step()
 
     # ------------------------------------------------------------------
