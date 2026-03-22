@@ -45,7 +45,9 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | aacc3e8 |
+| 1 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | ff434fc |
+| 2 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | aacc3e8 |
+| 3 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -56,6 +58,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 | # | Trial | Strategy | Score | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |---|-------|----------|-------|--------------|----------|----------------|-----------|--------|
 | 1 | 1 | `baseline` | -17.9 | $-17.76 | 0% | $-18.00 | 0% | aacc3e8 |
+| 2 | 2 | `lr_high` | -17.8 | $-17.65 | 0% | $-18.00 | 0% | ff434fc |
 <!-- HISTORY_END -->
 
 ---
