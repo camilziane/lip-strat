@@ -332,9 +332,9 @@ def train_trial(
         agent.update(obs, action, rewards, info["selections"])
         obs, _ = train_env.reset()
 
-    train_r = _collect_results(eval_train, lambda o: agent.act(o, deterministic=False))
-    val_r   = _collect_results(eval_val,   lambda o: agent.act(o, deterministic=False))
-    test_r  = _collect_results(eval_test,  lambda o: agent.act(o, deterministic=False))
+    train_r = _collect_results(eval_train, lambda o: agent.act(o, deterministic=True))
+    val_r   = _collect_results(eval_val,   lambda o: agent.act(o, deterministic=True))
+    test_r  = _collect_results(eval_test,  lambda o: agent.act(o, deterministic=True))
 
     val_net_pr    = val_r["net"] / max(val_r["n_rounds"], 1)
     val_hit_rate  = val_r["round_hit_rate"]
