@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Maximise test profit for a Loto Foot betting agent. The loop is simple:
 
-1. Run `uv run python improve.py` — it tries strategies continuously, commits new bests automatically.
-2. When you resume, the leaderboard is already updated. Read it, understand what helped, and push further.
-3. **Never break the loop** — if you change architecture or training code, verify it runs before committing.
+1. [ ] Run `uv run python improve.py` — it tries strategies continuously, commits new bests automatically.
+2. [ ] When you resume, the leaderboard is already updated. Read it, understand what helped, and push further.
+3. [ ] **Never break the loop** — if you change architecture or training code, verify it runs before committing.
 
 ## Commands
 
