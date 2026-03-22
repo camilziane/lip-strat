@@ -103,6 +103,30 @@ PREDEFINED: list[Strategy] = [
     # ── Combined best combinations ───────────────────────────────────────
     Strategy("linear_hlr_ep12k", ["linear", "lr=0.02", "ep=12k"], lr=0.02, episodes=12000),
     Strategy("linear_hlr_k32",   ["linear", "lr=0.02", "k=32"],   lr=0.02, k_max=32),
+    # ── Replicate near-best prior random search configs ──────────────────
+    # Trial 493 (best val ever): linear lr=0.015, entropy=0.078, k=50, ep=4k
+    Strategy("best493_clone",    ["linear", "lr=0.015", "entropy=0.078", "k=50", "ep=4k"],
+             lr=0.015, entropy_coef=0.078, k_max=50, episodes=4000),
+    # Trial 138 (best val+test both positive): linear lr=0.061, entropy=0.059, k=20, ep=4k
+    Strategy("best138_clone",    ["linear", "lr=0.061", "entropy=0.059", "k=20", "ep=4k"],
+             lr=0.061, entropy_coef=0.059, k_max=20, episodes=4000),
+    # Trial 41: linear lr=0.095, entropy=0.354, k=20, ep=16k
+    Strategy("best41_clone",     ["linear", "lr=0.095", "entropy=0.354", "k=20", "ep=16k"],
+             lr=0.095, entropy_coef=0.354, k_max=20, episodes=16000),
+    # Trial 234: mlp h=256 lr=0.0006, entropy=0.271, k=8, ep=16k
+    Strategy("best234_clone",    ["mlp", "h=256", "lr=0.0006", "entropy=0.271", "k=8", "ep=16k"],
+             policy="mlp", hidden_dim=256, lr=0.0006, entropy_coef=0.271, k_max=8, episodes=16000),
+    # ── MLP h=256 (consistently top-2 in prior random search) ────────────
+    Strategy("mlp_256",          ["mlp", "h=256"],               policy="mlp", hidden_dim=256),
+    Strategy("mlp_256_hlr",      ["mlp", "h=256", "lr=0.02"],    policy="mlp", hidden_dim=256, lr=0.02),
+    Strategy("mlp_256_k8",       ["mlp", "h=256", "k=8"],        policy="mlp", hidden_dim=256, k_max=8),
+    # ── k=50 combos (k=50 in top-3 of prior search) ──────────────────────
+    Strategy("linear_hlr_k50",   ["linear", "lr=0.02", "k=50"],  lr=0.02, k_max=50),
+    Strategy("mlp_128_k50",      ["mlp", "h=128", "k=50"],       policy="mlp", hidden_dim=128, k_max=50),
+    Strategy("mlp_64_k50",       ["mlp", "h=64", "k=50"],        policy="mlp", hidden_dim=64, k_max=50),
+    # ── More episodes (16k/20k found better val in prior search) ─────────
+    Strategy("linear_ep16k",     ["linear", "ep=16k"],            episodes=16000),
+    Strategy("mlp_128_ep16k",    ["mlp", "h=128", "ep=16k"],     policy="mlp", hidden_dim=128, episodes=16000),
 ]
 
 

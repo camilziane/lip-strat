@@ -10,13 +10,13 @@ episode:
     1. reset()  → observation of the N matches
     2. step(action) → reward, terminated=True, info
 
-Observation space  (Box, n_matches × 10)
-    Per match (10 features):
+Observation space  (Box, n_matches × 11)
+    Per match (11 features):
         implied_p1, implied_pN, implied_p2   – normalised from bookmaker odds
         rep1, repN, rep2                     – crowd % / 100
         margin                               – bookmaker overround (vig)
         log_spread                           – log(max_cote / min_cote)
-        value1, value2                       – crowd vs implied divergence for 1 and 2
+        value1, valueN, value2               – crowd vs implied divergence for all 3 outcomes
 
 Action space  (Box, n_matches × 3, in [0, 1])
     Binary selection mask: values > 0.5 mean "select this outcome".
@@ -41,7 +41,7 @@ from gymnasium import spaces
 
 
 N_OUTCOMES = 3       # 0=home(1), 1=draw(N), 2=away(2)
-N_FEATURES = 10      # per match
+N_FEATURES = 11      # per match
 COST_PER_GRID = 1.0
 
 # Supported grid sizes and how many ranks they use
@@ -54,10 +54,17 @@ VALID_N_MATCHES = {7, 8, 12, 15}
 
 def make_obs(grid: dict) -> np.ndarray:
     """
-    Build the (n_matches × 10)-dim observation vector from a grid dict.
+    Build the (n_matches × 11)-dim observation vector from a grid dict.
 
     grid must contain 'features_raw': flat list of 6 values per match:
         [cote1, coteN, cote2, rep1, repN, rep2]  (rep values 0–100)
+
+    Features (11 per match):
+        implied_p1, implied_pN, implied_p2   – normalised from bookmaker odds
+        rep1, repN, rep2                     – crowd % / 100
+        margin                               – bookmaker overround (vig)
+        log_spread                           – log(max_cote / min_cote)
+        value1, valueN, value2               – crowd vs implied divergence (all 3 outcomes)
     """
     n = grid["n_matches"]
     raw = np.array(grid["features_raw"], dtype=np.float32).reshape(n, 6)
@@ -74,10 +81,11 @@ def make_obs(grid: dict) -> np.ndarray:
 
         log_spread = float(np.log(max(c1, cn, c2) / min(c1, cn, c2)))
         value1 = float(crowd[0] - p[0])
+        valueN = float(crowd[1] - p[1])
         value2 = float(crowd[2] - p[2])
 
         obs[m] = [p[0], p[1], p[2], crowd[0], crowd[1], crowd[2],
-                  margin, log_spread, value1, value2]
+                  margin, log_spread, value1, valueN, value2]
 
     return obs.flatten()
 
