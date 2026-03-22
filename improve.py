@@ -182,6 +182,22 @@ PREDEFINED: list[Strategy] = [
              policy="mlp", hidden_dim=32, lr=0.02, k_max=32, n_seeds=3),
     Strategy("mlp32_anneal_k32",  ["mlp", "h=32", "anneal=0.3->0.01", "k=32"],
              policy="mlp", hidden_dim=32, entropy_coef=0.01, entropy_coef_start=0.3, k_max=32),
+    # ── More seeds exploration (mlp_32_s5 was best: val_net=+180.55) ─────────
+    Strategy("mlp32_s10",         ["mlp", "h=32", "seeds=10"],               policy="mlp", hidden_dim=32, n_seeds=10),
+    Strategy("mlp32_s20",         ["mlp", "h=32", "seeds=20"],               policy="mlp", hidden_dim=32, n_seeds=20),
+    Strategy("mlp32_k32_s10",     ["mlp", "h=32", "k=32", "seeds=10"],      policy="mlp", hidden_dim=32, k_max=32, n_seeds=10),
+    Strategy("mlp32_k32_s20",     ["mlp", "h=32", "k=32", "seeds=20"],      policy="mlp", hidden_dim=32, k_max=32, n_seeds=20),
+    Strategy("mlp32_ep12k_s5",    ["mlp", "h=32", "ep=12k", "seeds=5"],     policy="mlp", hidden_dim=32, episodes=12000, n_seeds=5),
+    Strategy("mlp32_ep12k_s10",   ["mlp", "h=32", "ep=12k", "seeds=10"],    policy="mlp", hidden_dim=32, episodes=12000, n_seeds=10),
+    Strategy("mlp32_elr_k32_s10", ["mlp", "h=32", "entropy=0.01", "k=32", "seeds=10"],
+             policy="mlp", hidden_dim=32, entropy_coef=0.01, k_max=32, n_seeds=10),
+    Strategy("mlp32_elr_s10",     ["mlp", "h=32", "entropy=0.01", "seeds=10"],
+             policy="mlp", hidden_dim=32, entropy_coef=0.01, n_seeds=10),
+    Strategy("mlp64_s5",          ["mlp", "h=64", "seeds=5"],                policy="mlp", hidden_dim=64, n_seeds=5),
+    Strategy("mlp64_s10",         ["mlp", "h=64", "seeds=10"],               policy="mlp", hidden_dim=64, n_seeds=10),
+    Strategy("mlp64_k32_s5",      ["mlp", "h=64", "k=32", "seeds=5"],       policy="mlp", hidden_dim=64, k_max=32, n_seeds=5),
+    Strategy("mlp128_s5",         ["mlp", "h=128", "seeds=5"],               policy="mlp", hidden_dim=128, n_seeds=5),
+    Strategy("mlp128_k32_s5",     ["mlp", "h=128", "k=32", "seeds=5"],      policy="mlp", hidden_dim=128, k_max=32, n_seeds=5),
 ]
 
 
