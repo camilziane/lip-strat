@@ -40,38 +40,35 @@
   },
   {
     "improvement_number": 1,
-    "trial": 13,
-    "strategy": "mlp_32",
+    "trial": 80,
+    "strategy": "random_79",
     "keywords": [
-      "mlp",
-      "h=32"
+      "linear",
+      "lr=0.0167",
+      "entropy=0.010",
+      "k=50",
+      "ep=4k"
     ],
-    "policy": "mlp",
-    "score": 19.9059,
-    "score_delta": 1.5118,
-    "val_net": 14.02,
-    "val_hit_pct": 11.8,
-    "test_net": -14.47,
+    "policy": "linear",
+    "score": 41.9941,
+    "score_delta": 22.0882,
+    "val_net": 33.17,
+    "val_hit_pct": 17.6,
+    "test_net": -28.06,
     "test_hit_pct": 0.0,
-    "timestamp": "2026-03-22 11:52",
-    "key_change": "Added: [h=32, mlp]  Removed: [linear, lr=0.02]",
+    "timestamp": "2026-03-22 12:09",
+    "key_change": "Added: [entropy=0.010, ep=4k, k=50, linear, lr=0.0167]  Removed: [h=32, mlp]",
     "what_worked": [
-      "Non-linear MLP policy (h=32) beat the linear baseline"
+      "Wider system bet (k=50) covered more combinations",
+      "Near-zero entropy \u2014 policy exploits learned patterns aggressively"
     ],
     "hypotheses_for_next_agent": [
-      "Try larger MLP h=64 \u2014 with only 10 features/match, more capacity may help",
-      "Try a 2-hidden-layer MLP: add second layer after ReLU (needs architecture change in train.py)",
-      "Try ep=12k or ep=20k with current winning config [mlp, h=32] \u2014 more training may refine the policy",
-      "Try k=32 \u2014 wider system bet coverage increases chances of hitting rang2 at the cost of more grids per round"
+      "Try MLP policy (h=64 or h=128) with same lr=0.0167 \u2014 non-linear features may extract more signal from odds + crowd %",
+      "Try ep=12k or ep=20k with current winning config [linear, lr=0.0167, entropy=0.010, k=50, ep=4k] \u2014 more training may refine the policy",
+      "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
     ],
-    "predefined_not_yet_tried": [
-      "mlp_64",
-      "mlp_128",
-      "mlp_64_hlr",
-      "mlp_64_ep12k",
-      "mlp_128_hlr"
-    ],
-    "total_trials_so_far": 13,
+    "predefined_not_yet_tried": [],
+    "total_trials_so_far": 80,
     "commit": ""
   }
 ]

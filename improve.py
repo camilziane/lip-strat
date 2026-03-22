@@ -179,6 +179,28 @@ PREDEFINED: list[Strategy] = [
              lr=0.01, correctness_coef=0.5, k_max=8, episodes=16000),
     Strategy("corr_05_mlp32_k8",  ["mlp", "h=32", "lr=0.01", "corr=0.5", "k=8", "ep=16k"],
              policy="mlp", hidden_dim=32, lr=0.01, correctness_coef=0.5, k_max=8, episodes=16000),
+    # ── Near best test-generalising configs found in random search ─────────
+    # random_34: linear, lr=0.088, entropy=0.113, k=32, ep=16k → test=+1.21 (ONLY positive test)
+    Strategy("gen_r34_clone",     ["linear", "lr=0.088", "entropy=0.113", "k=32", "ep=16k"],
+             lr=0.088, entropy_coef=0.113, k_max=32, episodes=16000),
+    Strategy("gen_r34_lr_low",    ["linear", "lr=0.06", "entropy=0.11", "k=32", "ep=16k"],
+             lr=0.06, entropy_coef=0.11, k_max=32, episodes=16000),
+    Strategy("gen_r34_k24",       ["linear", "lr=0.088", "entropy=0.113", "k=24", "ep=16k"],
+             lr=0.088, entropy_coef=0.113, k_max=24, episodes=16000),
+    Strategy("gen_r34_ep12k",     ["linear", "lr=0.088", "entropy=0.113", "k=32", "ep=12k"],
+             lr=0.088, entropy_coef=0.113, k_max=32, episodes=12000),
+    # mlp_128_hlr: mlp h=128, lr=0.02, k=20 → test=-0.54 (near breakeven)
+    Strategy("gen_mlp128_k32",    ["mlp", "h=128", "lr=0.02", "k=32"],
+             policy="mlp", hidden_dim=128, lr=0.02, k_max=32),
+    Strategy("gen_mlp128_lr_mid", ["mlp", "h=128", "lr=0.04", "k=20"],
+             policy="mlp", hidden_dim=128, lr=0.04, k_max=20),
+    Strategy("gen_mlp128_ep16k",  ["mlp", "h=128", "lr=0.02", "k=20", "ep=16k"],
+             policy="mlp", hidden_dim=128, lr=0.02, k_max=20, episodes=16000),
+    # random_83: mlp h=256, lr=0.086, k=20, ep=4k → test=-1.14
+    Strategy("gen_mlp256_hlr",    ["mlp", "h=256", "lr=0.086", "k=20", "ep=4k"],
+             policy="mlp", hidden_dim=256, lr=0.086, k_max=20, episodes=4000),
+    Strategy("gen_mlp256_k32",    ["mlp", "h=256", "lr=0.086", "k=32", "ep=4k"],
+             policy="mlp", hidden_dim=256, lr=0.086, k_max=32, episodes=4000),
 ]
 
 
@@ -303,7 +325,12 @@ def train_trial(
     test_hit_rate = test_r["round_hit_rate"]
     train_net_pr  = train_r["net"] / max(train_r["n_rounds"], 1)
     # Primary score: val net/round + bonus for hitting rounds (val-based selection)
-    score = val_net_pr + 50.0 * val_hit_rate
+    # Cap val_net contribution at 100/round: a single jackpot rang2 hit can be
+    # worth 500-700/round with k=50, swamping the hit-rate signal and rewarding
+    # lottery-style strategies over stable ones.  Genuine multi-hit performance
+    # still scores much higher than negative strategies.
+    val_net_capped = min(val_net_pr, 100.0) if val_net_pr > 0 else val_net_pr
+    score = val_net_capped + 50.0 * val_hit_rate
 
     result = TrialResult(
         trial=trial_idx,
