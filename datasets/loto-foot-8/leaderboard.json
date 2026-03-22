@@ -445,6 +445,6 @@
     "score": 34.9588,
     "model_path": "datasets/loto-foot-8/agent_best.npz",
     "timestamp": "2026-03-22 13:18",
-    "commit_hash": ""
+    "commit_hash": "2c728c6"
   }
 ]
