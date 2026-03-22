@@ -141,5 +141,26 @@
     "agent_notes": "mlp_32 (h=32) with default settings (k=20, lr=0.005, entropy=0.05) achieved val_net=+25.79/round - genuinely profitable on val! test_net=-16.00 is still negative though, showing high variance with 17 rounds. Score=+6.36 is by far the best so far. The nonlinear MLP is capturing something a linear policy cannot. Separately, k32 (linear, k=32) got +3.90 with test_net=-1.00 almost break-even - more combos gives more chances to catch the rare winning round. Next: combine mlp_32 with k=32, multi-seed, and lower entropy to try to improve test performance. Also: mlp_32 + k32 + entropy_low is the natural combination to try.",
     "total_trials_so_far": 13,
     "commit": "ed4e24d"
+  },
+  {
+    "improvement_number": 7,
+    "trial": 22,
+    "strategy": "mlp_128_k50",
+    "keywords": [
+      "mlp",
+      "h=128",
+      "k=50"
+    ],
+    "score": 34.9588,
+    "score_delta": 28.5941,
+    "val_net": 93.98,
+    "val_hit_pct": 5.9,
+    "test_net": -27.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 15:31",
+    "key_change": "Added: [h=128, k=50]  Removed: [h=32]",
+    "agent_notes": "",
+    "total_trials_so_far": 22,
+    "commit": "19490eb"
   }
 ]
