@@ -128,6 +128,43 @@ PREDEFINED: list[Strategy] = [
              policy="mlp", hidden_dim=64, entropy_coef=0.01, entropy_coef_start=0.3, k_max=32),
     Strategy("anneal_k32_s3",    ["linear", "anneal=0.3->0.01", "k=32", "seeds=3"],
              entropy_coef=0.01, entropy_coef_start=0.3, k_max=32, n_seeds=3),
+    # ── Player consensus features (require --extra-features player_consensus) ─
+    # These are skipped automatically when no extra features are loaded
+    # (obs_dim will differ and they are named distinctly for tracking).
+    Strategy("pc_baseline",      ["linear", "player_consensus"],
+             ),
+    Strategy("pc_entropy_high",  ["linear", "player_consensus", "entropy=0.2"],
+             entropy_coef=0.2),
+    Strategy("pc_k32",           ["linear", "player_consensus", "k=32"],
+             k_max=32),
+    Strategy("pc_mlp_64",        ["mlp",    "player_consensus", "h=64"],
+             policy="mlp", hidden_dim=64),
+    Strategy("pc_mlp_128_k32",   ["mlp",    "player_consensus", "h=128", "k=32"],
+             policy="mlp", hidden_dim=128, k_max=32),
+    # ── Dense auxiliary reward (correctness bonus) ────────────────────────
+    # Adds per-combo bonus = correctness_coef × (n_correct / n_matches).
+    # Addresses sparse reward: gives learning signal even when no prize is won.
+    Strategy("dense_corr01",     ["linear", "corr=0.1"],             correctness_coef=0.1),
+    Strategy("dense_corr05",     ["linear", "corr=0.5"],             correctness_coef=0.5),
+    Strategy("dense_corr01_k32", ["linear", "corr=0.1", "k=32"],     correctness_coef=0.1, k_max=32),
+    Strategy("dense_corr01_hlr", ["linear", "corr=0.1", "lr=0.02"],  correctness_coef=0.1, lr=0.02),
+    # ── Low-entropy focused combos (highest priority after entropy_low finding) ──
+    Strategy("elr_k32",          ["linear", "entropy=0.01", "k=32"],        entropy_coef=0.01, k_max=32),
+    Strategy("elr_k50",          ["linear", "entropy=0.01", "k=50"],        entropy_coef=0.01, k_max=50),
+    Strategy("elr_ep12k",        ["linear", "entropy=0.01", "ep=12k"],      entropy_coef=0.01, episodes=12000),
+    Strategy("elr_ep20k",        ["linear", "entropy=0.01", "ep=20k"],      entropy_coef=0.01, episodes=20000),
+    Strategy("elr_k32_ep12k",    ["linear", "entropy=0.01", "k=32", "ep=12k"], entropy_coef=0.01, k_max=32, episodes=12000),
+    Strategy("elr_k50_ep12k",    ["linear", "entropy=0.01", "k=50", "ep=12k"], entropy_coef=0.01, k_max=50, episodes=12000),
+    Strategy("elr_k32_s5",       ["linear", "entropy=0.01", "k=32", "seeds=5"], entropy_coef=0.01, k_max=32, n_seeds=5),
+    Strategy("elr_k50_s5",       ["linear", "entropy=0.01", "k=50", "seeds=5"], entropy_coef=0.01, k_max=50, n_seeds=5),
+    Strategy("elr_mlp32",        ["mlp", "h=32", "entropy=0.01"],           policy="mlp", hidden_dim=32, entropy_coef=0.01),
+    Strategy("elr_mlp32_k32",    ["mlp", "h=32", "entropy=0.01", "k=32"], policy="mlp", hidden_dim=32, entropy_coef=0.01, k_max=32),
+    Strategy("elr_mlp32_k32_s5", ["mlp", "h=32", "entropy=0.01", "k=32", "seeds=5"],
+             policy="mlp", hidden_dim=32, entropy_coef=0.01, k_max=32, n_seeds=5),
+    # ── Value-focused: use implied probs directly (zero entropy to be greedy) ──
+    Strategy("zero_k32",         ["linear", "entropy=0", "k=32"],           entropy_coef=0.0, k_max=32),
+    Strategy("zero_k50",         ["linear", "entropy=0", "k=50"],           entropy_coef=0.0, k_max=50),
+    Strategy("zero_k32_ep12k",   ["linear", "entropy=0", "k=32", "ep=12k"], entropy_coef=0.0, k_max=32, episodes=12000),
 ]
 
 
@@ -185,16 +222,20 @@ class TrialResult:
     commit_hash: str = ""
 
 
-def build_agent(strategy: Strategy, n_matches: int, seed: int) -> REINFORCEAgent:
+def build_agent(
+    strategy: Strategy, n_matches: int, seed: int, obs_dim: int | None = None
+) -> REINFORCEAgent:
     if strategy.policy == "mlp":
         return MLPREINFORCEAgent(
             n_matches=n_matches, hidden_dim=strategy.hidden_dim,
             k_max=strategy.k_max, lr=strategy.lr,
             entropy_coef=strategy.entropy_coef, seed=seed,
+            obs_dim=obs_dim,
         )
     return REINFORCEAgent(
         n_matches=n_matches, k_max=strategy.k_max,
         lr=strategy.lr, entropy_coef=strategy.entropy_coef, seed=seed,
+        obs_dim=obs_dim,
     )
 
 
@@ -231,8 +272,10 @@ def train_trial(
     eval_val   = LotoFootEnv(val_grids,   k_max=k, mode="eval")
     eval_test  = LotoFootEnv(test_grids,  k_max=k, mode="eval")
 
+    obs_dim = train_env.obs_dim   # accounts for extra features
+
     def _run_one_seed(s: int) -> REINFORCEAgent:
-        ag = build_agent(strategy, n_matches, s)
+        ag = build_agent(strategy, n_matches, s, obs_dim=obs_dim)
         if init_model_path and os.path.exists(init_model_path):
             _warm_start(ag, init_model_path)
         # Entropy annealing: if entropy_coef_start > 0, linearly anneal from
@@ -415,17 +458,6 @@ def load_summaries() -> list[dict]:
     return []
 
 
-def _kw_map(keywords: list[str]) -> dict[str, str]:
-    """Parse ['lr=0.02', 'mlp', 'h=64'] → {'lr': '0.02', 'mlp': '', 'h': '64'}."""
-    out: dict[str, str] = {}
-    for kw in keywords:
-        if "=" in kw:
-            k, v = kw.split("=", 1)
-            out[k] = v
-        else:
-            out[kw] = ""
-    return out
-
 
 def generate_improvement_summary(
     result: TrialResult,
@@ -433,21 +465,15 @@ def generate_improvement_summary(
     board: list[dict],
 ) -> dict:
     """
-    Auto-generate a structured summary of what worked and what to try next.
-    Saved to summaries.json; read by the next agent run for context.
-    """
-    kw = _kw_map(result.keywords)
-    policy = "mlp" if "mlp" in kw else "linear"
-    lr = float(kw.get("lr", 0.005))
-    entropy = float(kw.get("entropy", 0.05)) if "entropy" in kw else 0.05
-    h = int(kw.get("h", 0))
-    ep_str = kw.get("ep", "6k")
-    ep = int(ep_str.replace("k", "")) * 1000 if "k" in ep_str else int(ep_str)
-    k_val = int(kw.get("k", 20))
+    Build a factual summary of the new best trial.
+    Saved to summaries.json; displayed in the dashboard and read on next run.
 
+    The 'agent_notes' field is intentionally left empty — the autoresearch
+    agent (Claude) fills it in with its own reasoning after each improvement.
+    """
     score_delta = result.score - (prev_best["score"] if prev_best else 0.0)
 
-    # Key change from previous best
+    # Keyword diff vs previous best
     if prev_best:
         prev_kw = set(prev_best.get("keywords", []))
         cur_kw  = set(result.keywords)
@@ -461,78 +487,11 @@ def generate_improvement_summary(
     else:
         key_change = "First improvement found"
 
-    # What worked analysis
-    insights: list[str] = []
-    if policy == "mlp":
-        insights.append(f"Non-linear MLP policy (h={h}) beat the linear baseline")
-    if lr >= 0.02:
-        insights.append(f"Higher learning rate ({lr}) helped — faster adaptation to prize structure")
-    elif lr <= 0.001:
-        insights.append(f"Low learning rate ({lr}) — slow but stable convergence")
-    if ep >= 12000:
-        insights.append(f"More episodes ({ep_str}) gave better convergence")
-    if k_val >= 32:
-        insights.append(f"Wider system bet (k={k_val}) covered more combinations")
-    if entropy <= 0.01:
-        insights.append("Near-zero entropy — policy exploits learned patterns aggressively")
-    if not insights:
-        insights.append(f"Strategy [{result.strategy_name}] found a better combination of features")
-
-    # What to try next (hypotheses for the next agent)
-    tried_strategies = {e["strategy_name"] for e in board}
-    hypotheses: list[str] = []
-
-    if policy == "linear":
-        hypotheses.append(
-            f"Try MLP policy (h=64 or h=128) with same lr={lr:.4f} — "
-            "non-linear features may extract more signal from odds + crowd %"
-        )
-    else:
-        if h < 128:
-            hypotheses.append(
-                f"Try larger MLP h={h * 2} — with only 10 features/match, "
-                "more capacity may help"
-            )
-        hypotheses.append(
-            "Try a 2-hidden-layer MLP: add second layer after ReLU "
-            "(needs architecture change in train.py)"
-        )
-
-    if ep < 12000:
-        hypotheses.append(
-            f"Try ep=12k or ep=20k with current winning config "
-            f"[{', '.join(result.keywords)}] — more training may refine the policy"
-        )
-
-    if lr < 0.02 and "lr_high" not in tried_strategies:
-        hypotheses.append(f"Try lr=0.02 — higher LR sometimes escapes flat regions faster")
-    elif lr >= 0.02 and entropy > 0.05:
-        hypotheses.append("Try entropy=0.01 — reduce exploration once a good LR is found")
-
-    if k_val <= 20:
-        hypotheses.append(
-            "Try k=32 — wider system bet coverage increases chances of hitting rang2 "
-            "at the cost of more grids per round"
-        )
-
-    # Reward shaping idea
-    hypotheses.append(
-        "Try reward shaping: scale reward by 1/implied_prob of the correct outcome "
-        "to encourage backing value bets (upsets)"
-    )
-
-    hypotheses = list(dict.fromkeys(hypotheses))[:4]  # deduplicate, keep 4
-
-    # Strategies not yet tried from PREDEFINED
-    all_predefined = [s.name for s in PREDEFINED]
-    not_tried = [s for s in all_predefined if s not in tried_strategies][:5]
-
     return {
         "improvement_number": len([e for e in board if e.get("commit_hash")]),
         "trial": result.trial,
         "strategy": result.strategy_name,
         "keywords": result.keywords,
-        "policy": policy,
         "score": round(result.score, 4),
         "score_delta": round(score_delta, 4),
         "val_net": result.val_net_per_round,
@@ -541,11 +500,9 @@ def generate_improvement_summary(
         "test_hit_pct": round(result.test_round_hit_rate * 100, 1),
         "timestamp": result.timestamp,
         "key_change": key_change.strip(),
-        "what_worked": insights,
-        "hypotheses_for_next_agent": hypotheses,
-        "predefined_not_yet_tried": not_tried,
+        "agent_notes": "",   # filled by the autoresearch agent after each improvement
         "total_trials_so_far": len(board),
-        "commit": "",  # filled after git_commit
+        "commit": "",        # filled after git_commit
     }
 
 
@@ -621,6 +578,62 @@ def save_improvement_figures(board: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# README template
+# ---------------------------------------------------------------------------
+
+# Path to the README template file (relative to this script's directory)
+_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "template", "dataset_README.md")
+
+
+def _make_readme_template(dataset_dir: str, xlsx_path: str) -> str:
+    """
+    Render template/dataset_README.md with dataset-specific metadata.
+
+    Parses the xlsx filename for date ranges and loads the file to get
+    round / match counts, then substitutes all {placeholder} markers.
+    """
+    name = os.path.basename(dataset_dir.rstrip("/\\"))
+
+    # ── Date ranges from filename ──────────────────────────────────────────
+    base = os.path.basename(xlsx_path)
+    m = re.search(r'grilles-(\d{4}-\d{2}-\d{2})_au_(\d{4}-\d{2}-\d{2})', base)
+    date_from = m.group(1) if m else "?"
+    date_to   = m.group(2) if m else "?"
+    m2 = re.search(r'rang-(\d{4}-\d{2}-\d{2})', base)
+    rank_from = m2.group(1) if m2 else "?"
+
+    # ── Round / match counts from data ────────────────────────────────────
+    try:
+        grids     = load_data(xlsx_path)
+        n_total   = len(grids)
+        n_test    = max(1, round(n_total * 0.2))
+        n_val     = max(1, round(n_total * 0.2))
+        n_train   = max(1, n_total - n_val - n_test)
+        n_matches = grids[0]["n_matches"] if grids else "?"
+    except Exception:
+        n_total = n_train = n_val = n_test = "?"
+        n_matches = "?"
+
+    from string import Template
+    with open(_TEMPLATE_PATH) as f:
+        template = Template(f.read())
+
+    return template.substitute(
+        name             = name,
+        date_from        = date_from,
+        date_to          = date_to,
+        rank_from        = rank_from,
+        n_total          = n_total,
+        n_train          = n_train,
+        n_val            = n_val,
+        n_test           = n_test,
+        n_matches        = n_matches,
+        n_matches_minus_1= (n_matches - 1) if isinstance(n_matches, int) else "?",
+        approx_hit_pct   = round(100 / n_val) if isinstance(n_val, int) else "?",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Git helpers
 # ---------------------------------------------------------------------------
 
@@ -682,8 +695,10 @@ def main() -> None:
     parser.add_argument("--max-trials",  type=int, default=0,
                         help="Stop after N trials (0 = run forever)")
     parser.add_argument("--seed",        type=int, default=42)
-    parser.add_argument("--reset",       action="store_true",
+    parser.add_argument("--reset",        action="store_true",
                         help="Clear all dataset state (leaderboard, model, logs) and exit")
+    parser.add_argument("--extra-features", type=str, default="",
+                        help="Comma-separated extra feature groups: player_consensus")
     args = parser.parse_args()
 
     # ── Override global output paths to dataset_dir ───────────────────────
@@ -718,7 +733,19 @@ def main() -> None:
             if os.path.exists(path):
                 os.remove(path)
                 cleared.append(path)
-        subprocess.run(["git", "add", LEADERBOARD_PATH, SUMMARIES_PATH], capture_output=True)
+        # ── Restore README.md from template ───────────────────────────────
+        xls_reset = args.file
+        if xls_reset is None:
+            xls_files = sorted(f for f in os.listdir(d) if f.endswith(".xlsx"))
+            xls_reset = os.path.join(d, xls_files[-1]) if xls_files else None
+        if xls_reset:
+            with open(CLAUDE_MD_PATH, "w") as f:
+                f.write(_make_readme_template(d, xls_reset))
+            cleared.append(CLAUDE_MD_PATH)
+        subprocess.run(
+            ["git", "add", LEADERBOARD_PATH, SUMMARIES_PATH, CLAUDE_MD_PATH],
+            capture_output=True,
+        )
         subprocess.run(
             ["git", "commit", "-m", f"reset: clear dataset state for {d}"],
             capture_output=True,
@@ -738,7 +765,8 @@ def main() -> None:
         log(f"Warm-start from: {args.init_model}")
 
     # ── Load data ────────────────────────────────────────────────────────
-    all_grids = load_data(args.file)
+    extra_features = [f.strip() for f in args.extra_features.split(",") if f.strip()]
+    all_grids = load_data(args.file, extra_features=extra_features or None)
     if len(all_grids) < 3:
         print(f"Not enough grids: {len(all_grids)} total, need ≥ 3")
         sys.exit(1)
@@ -780,16 +808,22 @@ def main() -> None:
         log(f"── Last improvement: #{last['improvement_number']} "
             f"strategy={last['strategy']}  score={last['score']:+.4f}  "
             f"val_net={last['val_net']:+.2f}")
-        log(f"   What worked : {'; '.join(last.get('what_worked', []))}")
-        for h in last.get("hypotheses_for_next_agent", []):
-            log(f"   -> {h}")
+        log(f"   Key change  : {last.get('key_change', '—')}")
+        notes = last.get("agent_notes", "").strip()
+        if notes:
+            log(f"   Agent notes : {notes[:120]}{'…' if len(notes) > 120 else ''}")
 
     # ── Strategy iterator ────────────────────────────────────────────────
     rng = np.random.default_rng(args.seed + trial_offset)
 
     def strategy_iter():
+        tried = {e["strategy_name"] for e in board}
+        skipped = [s.name for s in PREDEFINED if s.name in tried]
+        if skipped:
+            log(f"   ↷ Skipping {len(skipped)} already-tried PREDEFINED: {skipped}")
         for s in PREDEFINED:
-            yield s
+            if s.name not in tried:
+                yield s
         t = len(PREDEFINED)
         while True:
             yield random_strategy(rng, trial_offset + t)
@@ -856,7 +890,6 @@ def main() -> None:
                 update_claude_md(board)
                 log(f"   ★ NEW BEST  score={current_best:.4f}  commit={commit_hash}")
                 log(f"   Key change : {summary['key_change']}")
-                log(f"   Next ideas : {summary['hypotheses_for_next_agent'][0] if summary['hypotheses_for_next_agent'] else '—'}")
                 log(f"   ─────────────────────────────────────────────────────")
             else:
                 save_leaderboard(board)

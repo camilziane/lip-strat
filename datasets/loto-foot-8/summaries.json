@@ -18,7 +18,7 @@
     "test_hit_pct": 0.0,
     "timestamp": "2026-03-22 15:27",
     "key_change": "First improvement found",
-    "agent_notes": "",
+    "agent_notes": "Baseline run established a floor. All 5 initial strategies failed to hit any prizes in either val or test. The key surprise was entropy_low (entropy=0.01) in trial 5 - it achieved 6% val hit rate vs 0% for all others. This suggests the reward signal is dominated by committing to specific outcomes rather than hedging; with 8 matches needing all-correct, a focused policy is essential.",
     "total_trials_so_far": 1,
     "commit": "675174d"
   },
@@ -38,7 +38,7 @@
     "test_hit_pct": 0.0,
     "timestamp": "2026-03-22 15:27",
     "key_change": "Added: [lr=0.02]  Removed: [entropy=0.05, ep=6k, k=20, lr=0.005]",
-    "agent_notes": "",
+    "agent_notes": "Higher LR (0.02) marginally improved over baseline but still 0% hit rate. The LR sweeps show diminishing returns in the no-hit regime - the policy is not learning to pick winners.",
     "total_trials_so_far": 2,
     "commit": "b0a09ff"
   },
@@ -58,8 +58,28 @@
     "test_hit_pct": 0.0,
     "timestamp": "2026-03-22 15:27",
     "key_change": "Added: [lr=0.05]  Removed: [lr=0.02]",
-    "agent_notes": "",
+    "agent_notes": "Very high LR (0.05) improved test slightly (-17.29 vs -18.00) but val was still -18.00. Likely overfitting to training noise. Still 0% hit rate.",
     "total_trials_so_far": 4,
     "commit": "bfcc030"
+  },
+  {
+    "improvement_number": 3,
+    "trial": 5,
+    "strategy": "entropy_low",
+    "keywords": [
+      "linear",
+      "entropy=0.01"
+    ],
+    "score": -13.5853,
+    "score_delta": 4.0618,
+    "val_net": -12.11,
+    "val_hit_pct": 5.9,
+    "test_net": -18.0,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 15:27",
+    "key_change": "Added: [entropy=0.01]  Removed: [lr=0.05]",
+    "agent_notes": "entropy_low (entropy=0.01) is the real breakthrough: val_hit=6% means 1/17 val rounds had a winning combo. The lower entropy forces the policy to commit to its best guess per match rather than spreading bets. Next priority: combine low entropy with larger k (32-50) to get more coverage while maintaining focused per-match picks, and try multi-seed to reduce variance. Also try entropy=0 and longer training.",
+    "total_trials_so_far": 5,
+    "commit": "62cf919"
   }
 ]

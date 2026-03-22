@@ -45,10 +45,11 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | bfcc030 |
-| 2 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | b0a09ff |
-| 3 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 675174d |
-| 4 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 1 | 5 | `entropy_low` | linear, entropy=0.01 | $-12.11 | 5.9% | $-18.00 | 0.0% | 62cf919 |
+| 2 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | bfcc030 |
+| 3 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | b0a09ff |
+| 4 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 675174d |
+| 5 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -61,6 +62,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 | 1 | 1 | `baseline` | -17.9 | $-17.76 | 0% | $-18.00 | 0% | 675174d |
 | 2 | 2 | `lr_high` | -17.8 | $-17.65 | 0% | $-18.00 | 0% | b0a09ff |
 | 3 | 4 | `lr_very_high` | -17.6 | $-18.00 | 0% | $-17.29 | 0% | bfcc030 |
+| 4 | 5 | `entropy_low` | -13.6 | $-12.11 | 6% | $-18.00 | 0% | 62cf919 |
 <!-- HISTORY_END -->
 
 ---
@@ -81,8 +83,14 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 
 ## What to Try Next
 
-1. **Entropy sweep** — try entropy_coef ∈ {0.0, 0.01, 0.05, 0.2} to balance exploration vs exploitation
-2. **k_max sweep** — try k=8 (consistent loss) vs k=32/50 (more coverage, higher hit chance)
-3. **Multi-seed (n_seeds=5)** — reduce init-seed variance by keeping the best of 5 seeds
-4. **Dense reward** — add correctness_coef bonus to address sparse reward signal
-5. **Player consensus features** — run with `--extra-features player_consensus` to add top-50 player picks
+**Analysis of baseline results (5 trials):**
+The key finding is that entropy_low (entropy=0.01) achieved val_hit=6% while all others had 0%. Low entropy forces the policy to commit to specific outcomes rather than hedging, which is necessary to win prizes (you need all 8 correct). The gap between val (-12.11) and test (-18.00) is partially noise (17 rounds each) but the direction is real.
+
+**Next steps (priority order):**
+1. entropy_low + k=32/50: if low entropy helps win rounds, more combos gives more chances to hit
+2. entropy_zero (0.0): fully deterministic convergence to the most likely outcomes per match
+3. Multi-seed entropy_low (5 seeds): reduce init variance and find better trained model
+4. Dense reward + low entropy: correctness_coef=0.1 + entropy=0.01 for better learning signal
+5. Longer training (12k-20k episodes) with entropy=0.01
+6. MLP + low entropy: h=32/64 with entropy=0.01 might capture nonlinear interactions
+7. Entropy annealing: start broad (0.3), anneal to 0.01 for coverage then focus
