@@ -40,35 +40,34 @@
   },
   {
     "improvement_number": 1,
-    "trial": 80,
-    "strategy": "random_79",
+    "trial": 96,
+    "strategy": "random_95",
     "keywords": [
       "linear",
-      "lr=0.0167",
-      "entropy=0.010",
+      "lr=0.0048",
+      "entropy=0.057",
       "k=50",
-      "ep=4k"
+      "ep=16k"
     ],
     "policy": "linear",
-    "score": 41.9941,
-    "score_delta": 22.0882,
-    "val_net": 33.17,
-    "val_hit_pct": 17.6,
-    "test_net": -28.06,
-    "test_hit_pct": 0.0,
-    "timestamp": "2026-03-22 12:09",
-    "key_change": "Added: [entropy=0.010, ep=4k, k=50, linear, lr=0.0167]  Removed: [h=32, mlp]",
+    "score": 697.1059,
+    "score_delta": 655.1118,
+    "val_net": 694.16,
+    "val_hit_pct": 5.9,
+    "test_net": -35.03,
+    "test_hit_pct": 5.9,
+    "timestamp": "2026-03-22 12:14",
+    "key_change": "Added: [entropy=0.057, ep=16k, lr=0.0048]  Removed: [entropy=0.010, ep=4k, lr=0.0167]",
     "what_worked": [
-      "Wider system bet (k=50) covered more combinations",
-      "Near-zero entropy \u2014 policy exploits learned patterns aggressively"
+      "More episodes (16k) gave better convergence",
+      "Wider system bet (k=50) covered more combinations"
     ],
     "hypotheses_for_next_agent": [
-      "Try MLP policy (h=64 or h=128) with same lr=0.0167 \u2014 non-linear features may extract more signal from odds + crowd %",
-      "Try ep=12k or ep=20k with current winning config [linear, lr=0.0167, entropy=0.010, k=50, ep=4k] \u2014 more training may refine the policy",
+      "Try MLP policy (h=64 or h=128) with same lr=0.0048 \u2014 non-linear features may extract more signal from odds + crowd %",
       "Try reward shaping: scale reward by 1/implied_prob of the correct outcome to encourage backing value bets (upsets)"
     ],
     "predefined_not_yet_tried": [],
-    "total_trials_so_far": 80,
+    "total_trials_so_far": 96,
     "commit": ""
   }
 ]

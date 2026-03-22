@@ -827,11 +827,22 @@ def main() -> None:
     strategies = strategy_iter()
     trial = trial_offset
 
+    # Track mtimes of key source files so we can self-restart when Claude edits them
+    _watched = ["improve.py", "train.py", "env.py"]
+    _mtimes  = {f: os.path.getmtime(f) for f in _watched if os.path.exists(f)}
+
     try:
         while True:
             if args.max_trials > 0 and (trial - trial_offset) >= args.max_trials:
                 log(f"Reached --max-trials {args.max_trials}, stopping.")
                 break
+
+            # ── Auto-restart when source files change ──────────────────────
+            for f in _watched:
+                if os.path.exists(f) and os.path.getmtime(f) != _mtimes.get(f):
+                    log(f"   ↻ {f} changed — restarting improve.py to pick up new code …")
+                    save_leaderboard(board)
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
 
             strategy = next(strategies)
             trial += 1
