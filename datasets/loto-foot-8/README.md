@@ -45,18 +45,21 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 <!-- LEADERBOARD_START -->
 | Rank | Trial | Strategy | Keywords | Val Net/Round | Val Hit% | Test Net/Round | Test Hit% | Commit |
 |------|-------|----------|----------|--------------|----------|----------------|-----------|--------|
-| 1 | 9 | `k32` | linear, k=32 | $+5.85 | 5.9% | $-1.00 | 0.0% | d5b5e48 |
-| 2 | 8 | `k8` | linear, k=8 | $-7.06 | 0.0% | $-7.53 | 0.0% | 7278425 |
-| 3 | 5 | `entropy_low` | linear, entropy=0.01 | $-12.11 | 5.9% | $-18.00 | 0.0% | 62cf919 |
-| 4 | 11 | `ep_12k` | linear, ep=12k | $-16.82 | 0.0% | $-16.94 | 0.0% | — |
-| 5 | 7 | `entropy_zero` | linear, entropy=0 | $-16.94 | 0.0% | $-17.53 | 0.0% | — |
-| 6 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | bfcc030 |
-| 7 | 6 | `entropy_high` | linear, entropy=0.2 | $-17.29 | 0.0% | $-18.00 | 0.0% | — |
-| 8 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | b0a09ff |
-| 9 | 12 | `ep_20k` | linear, ep=20k | $-17.65 | 0.0% | $-18.00 | 0.0% | — |
-| 10 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 675174d |
-| 11 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
-| 12 | 10 | `k50` | linear, k=50 | $-38.65 | 0.0% | $-39.88 | 0.0% | — |
+| 1 | 13 | `mlp_32` | mlp, h=32 | $+25.79 | 5.9% | $-16.00 | 0.0% | ed4e24d |
+| 2 | 9 | `k32` | linear, k=32 | $+5.85 | 5.9% | $-1.00 | 0.0% | d5b5e48 |
+| 3 | 8 | `k8` | linear, k=8 | $-7.06 | 0.0% | $-7.53 | 0.0% | 7278425 |
+| 4 | 5 | `entropy_low` | linear, entropy=0.01 | $-12.11 | 5.9% | $-18.00 | 0.0% | 62cf919 |
+| 5 | 14 | `mlp_64` | mlp, h=64 | $-16.00 | 0.0% | $-16.00 | 0.0% | — |
+| 6 | 11 | `ep_12k` | linear, ep=12k | $-16.82 | 0.0% | $-16.94 | 0.0% | — |
+| 7 | 7 | `entropy_zero` | linear, entropy=0 | $-16.94 | 0.0% | $-17.53 | 0.0% | — |
+| 8 | 4 | `lr_very_high` | linear, lr=0.05 | $-18.00 | 0.0% | $-17.29 | 0.0% | bfcc030 |
+| 9 | 6 | `entropy_high` | linear, entropy=0.2 | $-17.29 | 0.0% | $-18.00 | 0.0% | — |
+| 10 | 2 | `lr_high` | linear, lr=0.02 | $-17.65 | 0.0% | $-18.00 | 0.0% | b0a09ff |
+| 11 | 12 | `ep_20k` | linear, ep=20k | $-17.65 | 0.0% | $-18.00 | 0.0% | — |
+| 12 | 1 | `baseline` | linear, lr=0.005, entropy=0.05, k=20, ep=6k | $-17.76 | 0.0% | $-18.00 | 0.0% | 675174d |
+| 13 | 3 | `lr_low` | linear, lr=0.001 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 14 | 15 | `mlp_128` | mlp, h=128 | $-18.00 | 0.0% | $-18.00 | 0.0% | — |
+| 15 | 10 | `k50` | linear, k=50 | $-38.65 | 0.0% | $-39.88 | 0.0% | — |
 <!-- LEADERBOARD_END -->
 
 ---
@@ -72,6 +75,7 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 | 4 | 5 | `entropy_low` | -13.6 | $-12.11 | 6% | $-18.00 | 0% | 62cf919 |
 | 5 | 8 | `k8` | -7.3 | $-7.06 | 0% | $-7.53 | 0% | 7278425 |
 | 6 | 9 | `k32` | +3.9 | $+5.85 | 6% | $-1.00 | 0% | d5b5e48 |
+| 7 | 13 | `mlp_32` | +6.4 | $+25.79 | 6% | $-16.00 | 0% | ed4e24d |
 <!-- HISTORY_END -->
 
 ---
@@ -95,11 +99,14 @@ Prize amounts vary by round (pari-mutuel pool). Typical rang1 ≈ €100–500k.
 **Analysis of baseline results (5 trials):**
 The key finding is that entropy_low (entropy=0.01) achieved val_hit=6% while all others had 0%. Low entropy forces the policy to commit to specific outcomes rather than hedging, which is necessary to win prizes (you need all 8 correct). The gap between val (-12.11) and test (-18.00) is partially noise (17 rounds each) but the direction is real.
 
+**Batch 2 analysis (trials 6-15):**
+Major finding: mlp_32 (h=32 MLP, default params) achieved val_net=+25.79/round - genuinely profitable on val! score=+6.36. Also k32 (linear, k=32) got +3.90 with test_net=-1.00. k50 was very bad (-39.26): too many combos, too expensive. The MLP nonlinearity captures feature interactions that linear policy cannot. The k=32 sweep shows more combos helps hit winning rounds without being too expensive (unlike k=50 which costs too much when no prize).
+
 **Next steps (priority order):**
-1. entropy_low + k=32/50: if low entropy helps win rounds, more combos gives more chances to hit
-2. entropy_zero (0.0): fully deterministic convergence to the most likely outcomes per match
-3. Multi-seed entropy_low (5 seeds): reduce init variance and find better trained model
-4. Dense reward + low entropy: correctness_coef=0.1 + entropy=0.01 for better learning signal
-5. Longer training (12k-20k episodes) with entropy=0.01
-6. MLP + low entropy: h=32/64 with entropy=0.01 might capture nonlinear interactions
-7. Entropy annealing: start broad (0.3), anneal to 0.01 for coverage then focus
+1. mlp32 + k=32: combine the two best findings
+2. mlp32 + k=32 + multi-seed (5): reduce init variance
+3. mlp32 + entropy=0.01 + k=32: combine low entropy with MLP and more combos
+4. mlp32 + longer training (12k-20k episodes): let the MLP converge better
+5. mlp32 + lr sweep: find optimal learning rate for h=32 MLP
+6. entropy annealing with MLP: start broad, focus on best outcomes
+7. Dense reward with mlp32: correctness bonus to address sparse rewards

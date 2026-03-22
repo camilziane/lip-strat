@@ -165,6 +165,23 @@ PREDEFINED: list[Strategy] = [
     Strategy("zero_k32",         ["linear", "entropy=0", "k=32"],           entropy_coef=0.0, k_max=32),
     Strategy("zero_k50",         ["linear", "entropy=0", "k=50"],           entropy_coef=0.0, k_max=50),
     Strategy("zero_k32_ep12k",   ["linear", "entropy=0", "k=32", "ep=12k"], entropy_coef=0.0, k_max=32, episodes=12000),
+    # ── MLP-32 focused combinations (mlp_32 was best: val_net=+25.79) ────────
+    Strategy("mlp32_k32",        ["mlp", "h=32", "k=32"],                   policy="mlp", hidden_dim=32, k_max=32),
+    Strategy("mlp32_k32_s5",     ["mlp", "h=32", "k=32", "seeds=5"],       policy="mlp", hidden_dim=32, k_max=32, n_seeds=5),
+    Strategy("mlp32_elr",        ["mlp", "h=32", "entropy=0.01"],           policy="mlp", hidden_dim=32, entropy_coef=0.01),
+    Strategy("mlp32_elr_k32",    ["mlp", "h=32", "entropy=0.01", "k=32"], policy="mlp", hidden_dim=32, entropy_coef=0.01, k_max=32),
+    Strategy("mlp32_elr_k32_s5", ["mlp", "h=32", "entropy=0.01", "k=32", "seeds=5"],
+             policy="mlp", hidden_dim=32, entropy_coef=0.01, k_max=32, n_seeds=5),
+    Strategy("mlp32_ep12k",      ["mlp", "h=32", "ep=12k"],                 policy="mlp", hidden_dim=32, episodes=12000),
+    Strategy("mlp32_ep20k",      ["mlp", "h=32", "ep=20k"],                 policy="mlp", hidden_dim=32, episodes=20000),
+    Strategy("mlp32_k32_ep12k",  ["mlp", "h=32", "k=32", "ep=12k"],       policy="mlp", hidden_dim=32, k_max=32, episodes=12000),
+    Strategy("mlp32_s5",         ["mlp", "h=32", "seeds=5"],                policy="mlp", hidden_dim=32, n_seeds=5),
+    Strategy("mlp32_hlr",        ["mlp", "h=32", "lr=0.02"],                policy="mlp", hidden_dim=32, lr=0.02),
+    Strategy("mlp32_hlr_k32",    ["mlp", "h=32", "lr=0.02", "k=32"],      policy="mlp", hidden_dim=32, lr=0.02, k_max=32),
+    Strategy("mlp32_hlr_k32_s3", ["mlp", "h=32", "lr=0.02", "k=32", "seeds=3"],
+             policy="mlp", hidden_dim=32, lr=0.02, k_max=32, n_seeds=3),
+    Strategy("mlp32_anneal_k32",  ["mlp", "h=32", "anneal=0.3->0.01", "k=32"],
+             policy="mlp", hidden_dim=32, entropy_coef=0.01, entropy_coef_start=0.3, k_max=32),
 ]
 
 
