@@ -72,6 +72,7 @@ class Strategy:
     entropy_coef: float = 0.05
     k_max: int = 20
     episodes: int = 6000
+    correctness_coef: float = 0.0   # dense aux reward: bonus per correct match in each combo
 
 
 PREDEFINED: list[Strategy] = [
@@ -164,6 +165,20 @@ PREDEFINED: list[Strategy] = [
              policy="mlp", hidden_dim=32, lr=0.01, k_max=16),
     Strategy("mlp_32_lr_high_k8", ["mlp", "h=32", "lr=0.02", "k=8"],
              policy="mlp", hidden_dim=32, lr=0.02, k_max=8),
+    # ── Correctness bonus: dense aux reward to escape sparse-prize regime ──
+    # Prize hits are ~1-2% per round; correctness gives signal every episode.
+    Strategy("corr_01_linear",    ["linear", "lr=0.01", "corr=0.1", "k=20", "ep=10k"],
+             lr=0.01, correctness_coef=0.1, k_max=20, episodes=10000),
+    Strategy("corr_01_mlp32",     ["mlp", "h=32", "lr=0.005", "corr=0.1", "k=20", "ep=10k"],
+             policy="mlp", hidden_dim=32, correctness_coef=0.1, k_max=20, episodes=10000),
+    Strategy("corr_02_linear",    ["linear", "lr=0.01", "corr=0.2", "k=20", "ep=10k"],
+             lr=0.01, correctness_coef=0.2, k_max=20, episodes=10000),
+    Strategy("corr_02_mlp32",     ["mlp", "h=32", "lr=0.005", "corr=0.2", "k=20", "ep=10k"],
+             policy="mlp", hidden_dim=32, correctness_coef=0.2, k_max=20, episodes=10000),
+    Strategy("corr_05_linear_k8", ["linear", "lr=0.01", "corr=0.5", "k=8", "ep=16k"],
+             lr=0.01, correctness_coef=0.5, k_max=8, episodes=16000),
+    Strategy("corr_05_mlp32_k8",  ["mlp", "h=32", "lr=0.01", "corr=0.5", "k=8", "ep=16k"],
+             policy="mlp", hidden_dim=32, lr=0.01, correctness_coef=0.5, k_max=8, episodes=16000),
 ]
 
 
@@ -175,12 +190,17 @@ def random_strategy(rng: np.random.Generator, trial_idx: int) -> Strategy:
     entropy = float(np.exp(rng.uniform(np.log(1e-4), np.log(0.3))))
     k = int(rng.choice([4, 8, 16, 20, 32, 50]))
     episodes = int(rng.choice([6000, 10000, 16000, 24000]))
+    # 40% of random trials use correctness bonus to explore the dense-reward regime
+    corr = float(rng.choice([0.0, 0.0, 0.0, 0.1, 0.2, 0.5]))
     name = f"random_{trial_idx}"
     keywords = [policy, f"h={hidden}" if policy == "mlp" else "",
                 f"lr={lr:.4f}", f"entropy={entropy:.3f}", f"k={k}", f"ep={episodes//1000}k"]
-    keywords = [k for k in keywords if k]
+    if corr > 0:
+        keywords.append(f"corr={corr}")
+    keywords = [kw for kw in keywords if kw]
     return Strategy(name, keywords, policy=policy, hidden_dim=hidden,
-                    lr=lr, entropy_coef=entropy, k_max=k, episodes=episodes)
+                    lr=lr, entropy_coef=entropy, k_max=k, episodes=episodes,
+                    correctness_coef=corr)
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +280,17 @@ def train_trial(
     for ep in range(1, strategy.episodes + 1):
         action = agent.act(obs)
         _, _, _, _, info = train_env.step(action)
-        agent.update(obs, action, info["per_combo_rewards"], info["selections"])
+        rewards = info["per_combo_rewards"]
+        if strategy.correctness_coef > 0.0:
+            # Dense auxiliary reward: fraction of matches correct per combo.
+            # Gives learning signal every episode, not just on rare prize hits.
+            outcomes = info["outcomes"]
+            correctness = np.array([
+                np.sum(c == outcomes) / n_matches
+                for c in info["all_combos"]
+            ], dtype=np.float32)
+            rewards = rewards + strategy.correctness_coef * correctness
+        agent.update(obs, action, rewards, info["selections"])
         obs, _ = train_env.reset()
 
     train_r = _collect_results(eval_train, lambda o: agent.act(o, deterministic=False))
