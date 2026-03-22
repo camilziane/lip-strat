@@ -576,7 +576,7 @@ def save_improvement_figures(board: list[dict]) -> None:
 def git_commit(result: TrialResult) -> str:
     """Stage relevant files and commit. Returns the short commit hash."""
     try:
-        files = [BEST_MODEL_PATH, LEADERBOARD_PATH, SUMMARIES_PATH, CLAUDE_MD_PATH, FIGURES_PATH]
+        files = [BEST_MODEL_PATH, LEADERBOARD_PATH, SUMMARIES_PATH, CLAUDE_MD_PATH]
         subprocess.run(["git", "add"] + [f for f in files if os.path.exists(f)],
                        check=True, capture_output=True)
         msg = (
@@ -594,6 +594,7 @@ def git_commit(result: TrialResult) -> str:
         ).stdout.strip()
         return result_hash
     except subprocess.CalledProcessError as e:
+        log(f"   git_commit failed: {e.stderr.decode(errors='replace').strip() if e.stderr else e}")
         return ""
 
 
