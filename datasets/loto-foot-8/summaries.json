@@ -41,5 +41,25 @@
     "agent_notes": "",
     "total_trials_so_far": 2,
     "commit": "b0a09ff"
+  },
+  {
+    "improvement_number": 2,
+    "trial": 4,
+    "strategy": "lr_very_high",
+    "keywords": [
+      "linear",
+      "lr=0.05"
+    ],
+    "score": -17.6471,
+    "score_delta": 0.1764,
+    "val_net": -18.0,
+    "val_hit_pct": 0.0,
+    "test_net": -17.29,
+    "test_hit_pct": 0.0,
+    "timestamp": "2026-03-22 15:27",
+    "key_change": "Added: [lr=0.05]  Removed: [lr=0.02]",
+    "agent_notes": "",
+    "total_trials_so_far": 4,
+    "commit": "bfcc030"
   }
 ]
